@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Push‑up Tracker</title>
+  <style>
+    :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+    html,body{height:100%}
+    body{margin:0;font:18px system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column}
+    header{padding:24px 32px;border-bottom:1px solid #222;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    header h1{font-size:28px;margin:0;letter-spacing:.3px}
+    main{max-width:1400px;margin:0 auto;padding:32px;display:grid;gap:24px}
+    .card{background:var(--card);border:1px solid #222;border-radius:16px;padding:24px}
+    .card h2{font-size:22px;margin:0 0 16px}
+    label{display:block;font-size:15px;color:var(--muted);margin-bottom:8px;font-weight:500}
+    input,select,button,textarea{background:#0f1012;color:var(--fg);border:1px solid #2a2b2f;border-radius:12px;padding:14px 16px;font:inherit;font-size:16px}
+    input[type=date]{padding:.7rem}
+    button{cursor:pointer;font-weight:500}
+    button.primary{background:var(--accent);border-color:var(--accent);color:white}
+    button.ghost{background:transparent}
+    .row{display:flex;gap:16px;flex-wrap:wrap}
+    .row>*{flex:1 1 180px}
+    .right{text-align:right}
+    .pill{font-size:15px;padding:8px 14px;border-radius:999px;border:1px solid #2b2c30;color:var(--muted);font-weight:500}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+    .status{font-weight:600;font-size:32px}
+    .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+    details summary{cursor:pointer;color:var(--muted);user-select:none;font-size:16px}
+    details summary:hover{color:var(--fg)}
+    .spacer{height:2px;background:#1b1b1e;margin:12px 0}
+    .month-group{margin-bottom:20px;border:1px solid #333;border-radius:12px;overflow:hidden}
+    .month-header{padding:18px 24px;background:#1f1f21;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:19px}
+    .month-header:hover{background:#242426}
+    .month-content{padding:16px;background:var(--bg)}
+    .day-group{margin-bottom:16px;border:1px solid #222;border-radius:10px;overflow:hidden}
+    .day-header{padding:14px 20px;background:#1a1a1c;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:16px}
+    .day-header:hover{background:#1f1f21}
+    .day-sets{padding:12px;background:var(--card)}
+    .set-item{padding:14px 16px;margin:8px 0;background:#0f1012;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:16px}
+    .set-info{flex:1}
+    .set-actions{display:flex;gap:10px}
+    .set-actions button{padding:10px 16px;font-size:15px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Push‑up Tracker</h1>
+    <span class="pill" id="storageInfo">localStorage</span>
+    <div class="pill" id="weekInfo">Week: —</div>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="addEntryH">
+      <h2 id="addEntryH">Add set</h2>
+      <div class="row">
+        <div>
+          <label for="date">Date</label>
+          <input id="date" type="date" />
+        </div>
+        <div>
+          <label for="reps">Reps</label>
+          <input id="reps" type="number" min="1" inputmode="numeric" placeholder="e.g. 20" />
+        </div>
+        <div>
+          <label for="note">Notes</label>
+          <input id="note" type="text" placeholder="type e.g. standard, tricep" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="addBtn">Add</button>
+        <button id="clearTodayBtn" class="ghost">Clear today</button>
+        <span class="pill" id="todayTotal">Today: 0</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="summaryH">
+      <h2 id="summaryH">Summary</h2>
+      <div class="grid">
+        <div>
+          <label>Daily total</label>
+          <div class="status" id="dailyTotal">0</div>
+        </div>
+        <div>
+          <label>Weekly total</label>
+          <div class="status" id="weeklyTotal">0</div>
+        </div>
+        <div>
+          <label>All‑time total</label>
+          <div class="status" id="allTimeTotal">0</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="row">
+        <div>
+          <label for="dailyTarget">Daily target</label>
+          <input id="dailyTarget" type="number" min="0" value="30" />
+        </div>
+        <div style="align-self:end">
+          <span class="pill" id="targetStatus">0% of target</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="chartH">
+      <h2 id="chartH">Progress Chart</h2>
+      <div style="position:relative;height:400px">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label for="chartDays">Show last</label>
+          <select id="chartDays">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="logH">
+      <h2 id="logH">Log</h2>
+      <div class="row" style="margin-bottom:16px">
+        <button id="expandAllBtn" class="ghost">Expand all</button>
+        <button id="collapseAllBtn" class="ghost">Collapse all</button>
+      </div>
+      <div id="logContainer"></div>
+      <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
+        <strong>Total sets:</strong> <span id="totalSets">0</span> | 
+        <strong>Total reps:</strong> <span id="totalReps">0</span>
+      </div>
+      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored locally in your browser. Use Export to back up or move devices.</p>
+    </section>
+
+    <section class="card" aria-labelledby="dataH">
+      <h2 id="dataH">Data</h2>
+      <div class="row">
+        <button id="exportBtn">Export JSON</button>
+        <input type="file" id="importFile" accept="application/json" />
+        <button id="importBtn">Import</button>
+        <button id="resetBtn" class="ghost">Reset all</button>
+      </div>
+      <details style="margin-top:16px">
+        <summary>See raw JSON</summary>
+        <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script>
+  // ------- storage -------
+  const KEY = 'pushup.tracker.v1';
+  function load(){
+    try { return JSON.parse(localStorage.getItem(KEY)) || { entries: [], target: 30 }; }
+    catch { return { entries: [], target: 30 }; }
+  }
+  function save(state){ localStorage.setItem(KEY, JSON.stringify(state)); render(); }
+
+  // ------- state -------
+  let state = load();
+  let chartInstance = null;
+
+  // ------- helpers -------
+  const $ = sel => document.querySelector(sel);
+  const todayISO = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  function wkRange(d){
+    // ISO week: Monday start
+    const dt = new Date(d);
+    const day = (dt.getDay()+6)%7; // 0=Mon
+    const mon = new Date(dt); mon.setDate(dt.getDate()-day);
+    const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+    return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+  }
+
+  function totalsFor(dateStr){
+    const dayTotal = state.entries.filter(e=>e.date===dateStr).reduce((a,b)=>a+b.reps,0);
+    const [ws,we] = wkRange(dateStr);
+    const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
+    const all = state.entries.reduce((a,b)=>a+b.reps,0);
+    return { dayTotal, weekTotal, all };
+  }
+
+  function render(){
+    // inputs
+    $('#date').value ||= todayISO();
+    $('#dailyTarget').value = state.target;
+
+    // Group entries by date
+    const grouped = {};
+    state.entries.forEach(e => {
+      if(!grouped[e.date]) grouped[e.date] = [];
+      grouped[e.date].push(e);
+    });
+
+    // Sort dates descending and sort sets within each day
+    const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+    dates.forEach(date => {
+      grouped[date].sort((a,b) => b.createdAt - a.createdAt);
+    });
+
+    // Group dates by month
+    const monthGroups = {};
+    dates.forEach(date => {
+      const monthKey = date.slice(0, 7); // YYYY-MM
+      if(!monthGroups[monthKey]) monthGroups[monthKey] = [];
+      monthGroups[monthKey].push(date);
+    });
+
+    const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
+
+    // Render collapsible log by month and day
+    const container = $('#logContainer');
+    if(dates.length === 0){
+      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
+    } else {
+      container.innerHTML = months.map(monthKey => {
+        const monthDates = monthGroups[monthKey];
+        const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        
+        // Calculate month totals
+        const monthTotalReps = monthDates.reduce((sum, date) => {
+          return sum + grouped[date].reduce((s, e) => s + e.reps, 0);
+        }, 0);
+        const monthTotalSets = monthDates.reduce((sum, date) => sum + grouped[date].length, 0);
+
+        return `
+          <div class="month-group">
+            <div class="month-header" onclick="toggleMonth('${monthKey}')">
+              <div>
+                <strong>${monthName}</strong>
+                <span style="color:var(--muted);margin-left:10px">${monthTotalSets} sets • ${monthDates.length} days</span>
+              </div>
+              <div>
+                <strong style="color:var(--accent)">${monthTotalReps} reps</strong>
+                <span style="margin-left:10px;color:var(--muted)" id="month-arrow-${monthKey}">▼</span>
+              </div>
+            </div>
+            <div class="month-content" id="month-${monthKey}" style="display:none">
+              ${monthDates.map(date => {
+                const sets = grouped[date];
+                const dayTotal = sets.reduce((sum, e) => sum + e.reps, 0);
+                const setCount = sets.length;
+                
+                return `
+                  <div class="day-group">
+                    <div class="day-header" onclick="toggleDay('${date}')">
+                      <div>
+                        <strong>${date}</strong>
+                        <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div>
+                        <strong style="color:var(--accent)">${dayTotal} reps</strong>
+                        <span style="margin-left:8px;color:var(--muted)" id="arrow-${date}">▼</span>
+                      </div>
+                    </div>
+                    <div class="day-sets" id="sets-${date}" style="display:none">
+                      ${sets.map(e => `
+                        <div class="set-item">
+                          <div class="set-info">
+                            <strong>${e.reps} reps</strong>
+                            ${e.note ? `<span style="color:var(--muted);margin-left:8px">${e.note}</span>` : ''}
+                          </div>
+                          <div class="set-actions">
+                            <button data-id="${e.id}" class="ghost edit">Edit</button>
+                            <button data-id="${e.id}" class="ghost del">Delete</button>
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Update totals
+    $('#totalSets').textContent = state.entries.length;
+    $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
+
+    // summary
+    const t = totalsFor($('#date').value || todayISO());
+    $('#dailyTotal').textContent = t.dayTotal;
+    $('#weeklyTotal').textContent = t.weekTotal;
+    $('#allTimeTotal').textContent = t.all;
+
+    // target status
+    const target = Number($('#dailyTarget').value)||0;
+    const pct = target ? Math.round((t.dayTotal/target)*100) : 0;
+    const el = $('#targetStatus');
+    el.textContent = `${pct}% of target`;
+    el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
+
+    // week info
+    const [ws,we] = wkRange($('#date').value || todayISO());
+    $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
+
+    // raw
+    $('#raw').textContent = JSON.stringify(state,null,2);
+
+    // chart
+    renderChart();
+  }
+
+  function toggleMonth(monthKey){
+    const contentEl = document.getElementById(`month-${monthKey}`);
+    const arrowEl = document.getElementById(`month-arrow-${monthKey}`);
+    if(contentEl.style.display === 'none'){
+      contentEl.style.display = 'block';
+      arrowEl.textContent = '▲';
+    } else {
+      contentEl.style.display = 'none';
+      arrowEl.textContent = '▼';
+    }
+  }
+
+  function toggleDay(date){
+    const setsEl = document.getElementById(`sets-${date}`);
+    const arrowEl = document.getElementById(`arrow-${date}`);
+    if(setsEl.style.display === 'none'){
+      setsEl.style.display = 'block';
+      arrowEl.textContent = '▲';
+    } else {
+      setsEl.style.display = 'none';
+      arrowEl.textContent = '▼';
+    }
+  }
+
+  function renderChart(){
+    const days = Number($('#chartDays').value) || 30;
+    const today = new Date();
+    const labels = [];
+    const data = [];
+    
+    // Generate date range
+    for(let i = days - 1; i >= 0; i--){
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().slice(0,10);
+      labels.push(dateStr);
+      
+      // Sum reps for this date
+      const dayTotal = state.entries
+        .filter(e => e.date === dateStr)
+        .reduce((sum, e) => sum + e.reps, 0);
+      data.push(dayTotal);
+    }
+
+    const ctx = $('#chart').getContext('2d');
+    
+    if(chartInstance){
+      chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Daily Push-ups',
+            data: data,
+            borderColor: '#4f8cff',
+            backgroundColor: 'rgba(79, 140, 255, 0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          },
+          {
+            label: 'Target',
+            data: Array(labels.length).fill(state.target),
+            borderColor: '#22c55e',
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#e7e7ea' }
+          },
+          tooltip: {
+            backgroundColor: '#151517',
+            titleColor: '#e7e7ea',
+            bodyColor: '#e7e7ea',
+            borderColor: '#222',
+            borderWidth: 1
+          }
+        },
+        scales: {
+          x: {
+            ticks: { 
+              color: '#9aa0a6',
+              maxRotation: 45,
+              minRotation: 45
+            },
+            grid: { color: '#222' }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#9aa0a6' },
+            grid: { color: '#222' }
+          }
+        }
+      }
+    });
+  }
+
+  // ------- events -------
+  $('#addBtn').addEventListener('click', () => {
+    const date = $('#date').value || todayISO();
+    const reps = Number($('#reps').value);
+    if(!reps || reps<1) return alert('Enter reps');
+    const note = $('#note').value.trim();
+    const entry = { id: crypto.randomUUID(), date, reps, note, createdAt: Date.now() };
+    state.entries.push(entry);
+    save(state);
+    $('#reps').value = '';
+    $('#note').value = '';
+    updateTodayBadge();
+  });
+
+  function updateTodayBadge(){
+    const t = totalsFor(todayISO());
+    $('#todayTotal').textContent = `Today: ${t.dayTotal}`;
+  }
+
+  $('#clearTodayBtn').addEventListener('click', () => {
+    const d = $('#date').value || todayISO();
+    if(!confirm(`Delete all entries for ${d}?`)) return;
+    state.entries = state.entries.filter(e=>e.date!==d);
+    save(state);
+  });
+
+  $('#dailyTarget').addEventListener('change', () => {
+    state.target = Number($('#dailyTarget').value)||0;
+    save(state);
+  });
+
+  $('#logContainer').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const id = btn.getAttribute('data-id');
+    if(btn.classList.contains('del')){
+      if(!confirm('Delete this set?')) return;
+      state.entries = state.entries.filter(x=>x.id!==id);
+      save(state);
+    }
+    if(btn.classList.contains('edit')){
+      const rec = state.entries.find(x=>x.id===id);
+      const reps = Number(prompt('Reps', rec.reps));
+      if(!reps || reps<1) return;
+      const note = prompt('Notes', rec.note||'')||'';
+      rec.reps = reps; rec.note = note;
+      save(state);
+    }
+  });
+
+  $('#expandAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.month-content').forEach(el => {
+      el.style.display = 'block';
+    });
+    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+      el.textContent = '▲';
+    });
+    document.querySelectorAll('.day-sets').forEach(el => {
+      el.style.display = 'block';
+    });
+    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      el.textContent = '▲';
+    });
+  });
+
+  $('#collapseAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.month-content').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+      el.textContent = '▼';
+    });
+    document.querySelectorAll('.day-sets').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      el.textContent = '▼';
+    });
+  });
+
+  // Export/Import/Reset
+  $('#exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pushup-tracker.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('#importBtn').addEventListener('click', async () => {
+    const f = $('#importFile').files[0];
+    if(!f) return alert('Choose a JSON file first');
+    const text = await f.text();
+    try{
+      const data = JSON.parse(text);
+      if(!data || !Array.isArray(data.entries)) throw new Error('Invalid file');
+      state = { entries: data.entries, target: Number(data.target)||30 };
+      save(state);
+    }catch(err){ alert('Import failed: '+err.message); }
+  });
+
+  $('#resetBtn').addEventListener('click', () => {
+    if(!confirm('Permanently delete all data?')) return;
+    state = { entries: [], target: 30 };
+    save(state);
+  });
+
+  $('#chartDays').addEventListener('change', () => {
+    renderChart();
+  });
+
+  // init
+  $('#date').value = todayISO();
+  updateTodayBadge();
+  render();
+  </script>
+</body>
+</html>
