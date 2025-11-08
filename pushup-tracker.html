@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Push‑up Tracker</title>
+  <style>
+    :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+    html,body{height:100%}
+    body{margin:0;font:18px system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column}
+    header{padding:24px 32px;border-bottom:1px solid #222;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    header h1{font-size:28px;margin:0;letter-spacing:.3px}
+    main{max-width:1400px;margin:0 auto;padding:32px;display:grid;gap:24px}
+    .card{background:var(--card);border:1px solid #222;border-radius:16px;padding:24px}
+    .card h2{font-size:22px;margin:0 0 16px}
+    label{display:block;font-size:15px;color:var(--muted);margin-bottom:8px;font-weight:500}
+    input,select,button,textarea{background:#0f1012;color:var(--fg);border:1px solid #2a2b2f;border-radius:12px;padding:14px 16px;font:inherit;font-size:16px}
+    input[type=date]{padding:.7rem}
+    button{cursor:pointer;font-weight:500}
+    button.primary{background:var(--accent);border-color:var(--accent);color:white}
+    button.ghost{background:transparent}
+    button.danger{background:var(--bad);border-color:var(--bad);color:white}
+    .row{display:flex;gap:16px;flex-wrap:wrap}
+    .row>*{flex:1 1 180px}
+    .right{text-align:right}
+    .pill{font-size:15px;padding:8px 14px;border-radius:999px;border:1px solid #2b2c30;color:var(--muted);font-weight:500}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+    .status{font-weight:600;font-size:32px}
+    .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+    details summary{cursor:pointer;color:var(--muted);user-select:none;font-size:16px}
+    details summary:hover{color:var(--fg)}
+    .spacer{height:2px;background:#1b1b1e;margin:12px 0}
+    .month-group{margin-bottom:20px;border:1px solid #333;border-radius:12px;overflow:hidden}
+    .month-header{padding:18px 24px;background:#1f1f21;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:19px}
+    .month-header:hover{background:#242426}
+    .month-content{padding:16px;background:var(--bg)}
+    .day-group{margin-bottom:16px;border:1px solid #222;border-radius:10px;overflow:hidden}
+    .day-header{padding:14px 20px;background:#1a1a1c;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:16px}
+    .day-header:hover{background:#1f1f21}
+    .day-sets{padding:12px;background:var(--card)}
+    .set-item{padding:14px 16px;margin:8px 0;background:#0f1012;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:16px}
+    .set-info{flex:1}
+    .set-actions{display:flex;gap:10px}
+    .set-actions button{padding:10px 16px;font-size:15px}
+
+    /* Modal styles */
+    .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+    .modal{background:var(--card);border:1px solid #333;border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+    .modal h3{margin:0 0 24px;font-size:24px}
+    .modal-buttons{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
+    .modal-buttons button{min-width:100px}
+    .modal input,.modal textarea{width:100%;box-sizing:border-box;margin-bottom:16px}
+    .modal textarea{min-height:80px;resize:vertical;font-family:inherit}
+    .modal label{display:block;margin-bottom:4px}
+    
+    /* Streak badge */
+    .streak-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f59e0b,#ef4444);padding:10px 16px;border-radius:12px;font-weight:600;color:white;font-size:16px}
+    .streak-emoji{font-size:20px}
+    
+    /* Achievement celebration */
+    .celebration{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:40px;text-align:center;z-index:2000;animation:popIn 0.3s ease-out}
+    .celebration h2{margin:0 0 16px;font-size:32px;color:var(--ok)}
+    .celebration p{font-size:18px;margin:0 0 24px;color:var(--muted)}
+    .celebration button{min-width:120px}
+    @keyframes popIn{from{transform:translate(-50%,-50%) scale(0.8);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+    
+    /* Warning banner */
+    .warning-banner{background:#ef444420;border:1px solid var(--bad);border-radius:12px;padding:16px;margin-bottom:16px;display:flex;align-items:start;gap:12px}
+    .warning-banner strong{color:var(--bad)}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Push‑up Tracker</h1>
+    <span class="pill" id="storageInfo">localStorage</span>
+    <div class="pill" id="weekInfo">Week: —</div>
+    <div id="streakBadge"></div>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="addEntryH">
+      <h2 id="addEntryH">Add set</h2>
+      <div class="row">
+        <div>
+          <label for="date">Date</label>
+          <input id="date" type="date" />
+        </div>
+        <div>
+          <label for="reps">Reps</label>
+          <input id="reps" type="number" min="1" inputmode="numeric" placeholder="e.g. 20" />
+        </div>
+        <div>
+          <label for="note">Notes</label>
+          <input id="note" type="text" placeholder="type e.g. standard, tricep" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="addBtn">Add</button>
+        <button id="clearTodayBtn" class="ghost">Clear today</button>
+        <span class="pill" id="todayTotal">Today: 0</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="summaryH">
+      <h2 id="summaryH">Summary</h2>
+      <div class="grid">
+        <div>
+          <label>Daily total</label>
+          <div class="status" id="dailyTotal">0</div>
+        </div>
+        <div>
+          <label>Weekly total</label>
+          <div class="status" id="weeklyTotal">0</div>
+        </div>
+        <div>
+          <label>All‑time total</label>
+          <div class="status" id="allTimeTotal">0</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="grid">
+        <div>
+          <label>Highest set 💪</label>
+          <div class="status ok" id="highestSet">0</div>
+        </div>
+        <div>
+          <label>Average per set</label>
+          <div class="status" id="avgSet" style="font-size:28px">0</div>
+        </div>
+        <div>
+          <label>Sets today</label>
+          <div class="status" id="setsToday" style="font-size:28px">0</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="row">
+        <div>
+          <label for="dailyTarget">Daily target</label>
+          <input id="dailyTarget" type="number" min="0" value="30" />
+        </div>
+        <div style="align-self:end">
+          <span class="pill" id="targetStatus">0% of target</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="chartH">
+      <h2 id="chartH">Progress Chart</h2>
+      <div style="position:relative;height:400px">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label for="chartDays">Show last</label>
+          <select id="chartDays">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="logH">
+      <h2 id="logH">Log</h2>
+      <div class="row" style="margin-bottom:16px">
+        <button id="expandAllBtn" class="ghost">Expand all</button>
+        <button id="collapseAllBtn" class="ghost">Collapse all</button>
+      </div>
+      <div id="logContainer"></div>
+      <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
+        <strong>Total sets:</strong> <span id="totalSets">0</span> | 
+        <strong>Total reps:</strong> <span id="totalReps">0</span>
+      </div>
+      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored locally in your browser. Use Export to back up or move devices.</p>
+    </section>
+
+    <section class="card" aria-labelledby="dataH">
+      <h2 id="dataH">Data</h2>
+      <div class="row">
+        <button id="exportBtn">Export JSON</button>
+        <input type="file" id="importFile" accept="application/json" />
+        <button id="importBtn">Import</button>
+        <button id="resetBtn" class="ghost">Reset all</button>
+      </div>
+      <details style="margin-top:16px">
+        <summary>See raw JSON</summary>
+        <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script>
+  // ------- storage -------
+  const KEY = 'pushup.tracker.v1';
+  const BACKUP_KEY = 'pushup.tracker.backup';
+  
+  function load(){
+    try { return JSON.parse(localStorage.getItem(KEY)) || { entries: [], target: 30, lastStreak: 0 }; }
+    catch { return { entries: [], target: 30, lastStreak: 0 }; }
+  }
+  
+  function save(state){ 
+    // Auto-backup before save
+    try{
+      const current = localStorage.getItem(KEY);
+      if(current) localStorage.setItem(BACKUP_KEY, current);
+    }catch(e){}
+    
+    localStorage.setItem(KEY, JSON.stringify(state)); 
+    render(); 
+  }
+
+  // ------- state -------
+  let state = load();
+  let chartInstance = null;
+
+  // ------- helpers -------
+  const $ = sel => document.querySelector(sel);
+  const todayISO = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  function wkRange(d){
+    const dt = new Date(d);
+    const day = (dt.getDay()+6)%7;
+    const mon = new Date(dt); mon.setDate(dt.getDate()-day);
+    const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+    return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+  }
+
+  function totalsFor(dateStr){
+    const dayTotal = state.entries.filter(e=>e.date===dateStr).reduce((a,b)=>a+b.reps,0);
+    const [ws,we] = wkRange(dateStr);
+    const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
+    const all = state.entries.reduce((a,b)=>a+b.reps,0);
+    return { dayTotal, weekTotal, all };
+  }
+  
+  // Calculate current streak
+  function calculateStreak(){
+    if(state.entries.length === 0) return 0;
+    
+    const uniqueDates = [...new Set(state.entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
+    const today = todayISO();
+    
+    let streak = 0;
+    let checkDate = today;
+    
+    for(let i = 0; i < uniqueDates.length; i++){
+      if(uniqueDates[i] === checkDate){
+        streak++;
+        // Move to previous day
+        const d = new Date(checkDate);
+        d.setDate(d.getDate() - 1);
+        checkDate = d.toISOString().slice(0,10);
+      } else {
+        // Check if we should include yesterday for today's streak
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayISO = yesterday.toISOString().slice(0,10);
+        
+        if(i === 0 && uniqueDates[0] === yesterdayISO){
+          streak++;
+          const d = new Date(yesterdayISO);
+          d.setDate(d.getDate() - 1);
+          checkDate = d.toISOString().slice(0,10);
+        } else {
+          break;
+        }
+      }
+    }
+    
+    return streak;
+  }
+  
+  // Show achievement celebration
+  function showAchievement(type, value){
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.background = 'rgba(0,0,0,0.9)';
+    
+    let title = '', message = '', emoji = '';
+    
+    if(type === 'streak'){
+      emoji = '🔥';
+      title = `${value} Day Streak!`;
+      message = `Amazing! You've worked out ${value} days in a row. Keep it up!`;
+    } else if(type === 'target'){
+      emoji = '🎯';
+      title = 'Target Crushed!';
+      message = `You've hit your daily target! Great work!`;
+    } else if(type === 'milestone'){
+      emoji = '🏆';
+      title = `${value} Total Reps!`;
+      message = `Incredible milestone! You've completed ${value} push-ups!`;
+    } else if(type === 'pr'){
+      emoji = '💪';
+      title = 'New Personal Record!';
+      message = `${value} reps in a single set! That's your best yet!`;
+    }
+    
+    overlay.innerHTML = `
+      <div class="celebration">
+        <div style="font-size:64px;margin-bottom:16px">${emoji}</div>
+        <h2>${title}</h2>
+        <p>${message}</p>
+        <button class="primary" onclick="this.closest('.modal-overlay').remove()">Awesome!</button>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if(e.target === overlay) overlay.remove();
+    });
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => overlay.remove(), 5000);
+  }
+
+  function render(){
+    // inputs
+    $('#date').value ||= todayISO();
+    $('#dailyTarget').value = state.target;
+
+    // Group entries by date
+    const grouped = {};
+    state.entries.forEach(e => {
+      if(!grouped[e.date]) grouped[e.date] = [];
+      grouped[e.date].push(e);
+    });
+
+    const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+    dates.forEach(date => {
+      grouped[date].sort((a,b) => b.createdAt - a.createdAt);
+    });
+
+    const monthGroups = {};
+    dates.forEach(date => {
+      const monthKey = date.slice(0, 7);
+      if(!monthGroups[monthKey]) monthGroups[monthKey] = [];
+      monthGroups[monthKey].push(date);
+    });
+
+    const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
+
+    const container = $('#logContainer');
+    if(dates.length === 0){
+      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
+    } else {
+      container.innerHTML = months.map(monthKey => {
+        const monthDates = monthGroups[monthKey];
+        const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        
+        const monthTotalReps = monthDates.reduce((sum, date) => {
+          return sum + grouped[date].reduce((s, e) => s + e.reps, 0);
+        }, 0);
+        const monthTotalSets = monthDates.reduce((sum, date) => sum + grouped[date].length, 0);
+
+        return `
+          <div class="month-group">
+            <div class="month-header" onclick="toggleMonth('${monthKey}')">
+              <div>
+                <strong>${monthName}</strong>
+                <span style="color:var(--muted);margin-left:10px">${monthTotalSets} sets • ${monthDates.length} days</span>
+              </div>
+              <div>
+                <strong style="color:var(--accent)">${monthTotalReps} reps</strong>
+                <span style="margin-left:10px;color:var(--muted)" id="month-arrow-${monthKey}">▼</span>
+              </div>
+            </div>
+            <div class="month-content" id="month-${monthKey}" style="display:none">
+              ${monthDates.map(date => {
+                const sets = grouped[date];
+                const dayTotal = sets.reduce((sum, e) => sum + e.reps, 0);
+                const setCount = sets.length;
+                
+                return `
+                  <div class="day-group">
+                    <div class="day-header" onclick="toggleDay('${date}')">
+                      <div>
+                        <strong>${date}</strong>
+                        <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div>
+                        <strong style="color:var(--accent)">${dayTotal} reps</strong>
+                        <span style="margin-left:8px;color:var(--muted)" id="arrow-${date}">▼</span>
+                      </div>
+                    </div>
+                    <div class="day-sets" id="sets-${date}" style="display:none">
+                      ${sets.map(e => `
+                        <div class="set-item">
+                          <div class="set-info">
+                            <strong>${e.reps} reps</strong>
+                            ${e.note ? `<span style="color:var(--muted);margin-left:8px">${e.note}</span>` : ''}
+                          </div>
+                          <div class="set-actions">
+                            <button data-id="${e.id}" class="ghost edit-btn">Edit</button>
+                            <button data-id="${e.id}" class="ghost del-btn">Delete</button>
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    $('#totalSets').textContent = state.entries.length;
+    $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
+
+    const t = totalsFor($('#date').value || todayISO());
+    $('#dailyTotal').textContent = t.dayTotal;
+    $('#weeklyTotal').textContent = t.weekTotal;
+    $('#allTimeTotal').textContent = t.all;
+    
+    // Calculate highest set
+    const highestSet = state.entries.length > 0 ? Math.max(...state.entries.map(e => e.reps)) : 0;
+    $('#highestSet').textContent = highestSet;
+    
+    // Calculate average per set
+    const avgSet = state.entries.length > 0 ? Math.round(state.entries.reduce((a,b)=>a+b.reps,0) / state.entries.length) : 0;
+    $('#avgSet').textContent = avgSet;
+    
+    // Sets today
+    const todayDate = todayISO();
+    const setsToday = state.entries.filter(e => e.date === todayDate).length;
+    $('#setsToday').textContent = setsToday;
+
+    const target = Number($('#dailyTarget').value)||0;
+    const pct = target ? Math.round((t.dayTotal/target)*100) : 0;
+    const el = $('#targetStatus');
+    el.textContent = `${pct}% of target`;
+    el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
+
+    const [ws,we] = wkRange($('#date').value || todayISO());
+    $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
+    
+    // Update streak badge
+    const currentStreak = calculateStreak();
+    const streakEl = $('#streakBadge');
+    if(currentStreak >= 2){
+      streakEl.innerHTML = `<div class="streak-badge"><span class="streak-emoji">🔥</span>${currentStreak} day streak</div>`;
+    } else {
+      streakEl.innerHTML = '';
+    }
+
+    $('#raw').textContent = JSON.stringify(state,null,2);
+    renderChart();
+  }
+
+  function toggleMonth(monthKey){
+    const contentEl = document.getElementById(`month-${monthKey}`);
+    const arrowEl = document.getElementById(`month-arrow-${monthKey}`);
+    if(contentEl.style.display === 'none'){
+      contentEl.style.display = 'block';
+      arrowEl.textContent = '▲';
+    } else {
+      contentEl.style.display = 'none';
+      arrowEl.textContent = '▼';
+    }
+  }
+
+  function toggleDay(date){
+    const setsEl = document.getElementById(`sets-${date}`);
+    const arrowEl = document.getElementById(`arrow-${date}`);
+    if(setsEl.style.display === 'none'){
+      setsEl.style.display = 'block';
+      arrowEl.textContent = '▲';
+    } else {
+      setsEl.style.display = 'none';
+      arrowEl.textContent = '▼';
+    }
+  }
+
+  function renderChart(){
+    const days = Number($('#chartDays').value) || 30;
+    const today = new Date();
+    const labels = [];
+    const data = [];
+    
+    for(let i = days - 1; i >= 0; i--){
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().slice(0,10);
+      labels.push(dateStr);
+      
+      const dayTotal = state.entries
+        .filter(e => e.date === dateStr)
+        .reduce((sum, e) => sum + e.reps, 0);
+      data.push(dayTotal);
+    }
+
+    const ctx = $('#chart').getContext('2d');
+    
+    if(chartInstance){
+      chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Daily Push-ups',
+            data: data,
+            borderColor: '#4f8cff',
+            backgroundColor: 'rgba(79, 140, 255, 0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          },
+          {
+            label: 'Target',
+            data: Array(labels.length).fill(state.target),
+            borderColor: '#22c55e',
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#e7e7ea' }
+          },
+          tooltip: {
+            backgroundColor: '#151517',
+            titleColor: '#e7e7ea',
+            bodyColor: '#e7e7ea',
+            borderColor: '#222',
+            borderWidth: 1
+          }
+        },
+        scales: {
+          x: {
+            ticks: { 
+              color: '#9aa0a6',
+              maxRotation: 45,
+              minRotation: 45
+            },
+            grid: { color: '#222' }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#9aa0a6' },
+            grid: { color: '#222' }
+          }
+        }
+      }
+    });
+  }
+  
+  // Modal for editing
+  function showEditModal(entryId){
+    const entry = state.entries.find(x => x.id === entryId);
+    if(!entry) return;
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h3>Edit Set</h3>
+        <label>Reps</label>
+        <input type="number" id="editReps" value="${entry.reps}" min="1" />
+        <label>Notes</label>
+        <textarea id="editNote">${entry.note || ''}</textarea>
+        <div class="modal-buttons">
+          <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+          <button class="primary" id="saveEdit">Save</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    overlay.querySelector('#saveEdit').addEventListener('click', () => {
+      const reps = Number(overlay.querySelector('#editReps').value);
+      const note = overlay.querySelector('#editNote').value.trim();
+      
+      if(!reps || reps < 1){
+        alert('Please enter valid reps');
+        return;
+      }
+      
+      entry.reps = reps;
+      entry.note = note;
+      save(state);
+      overlay.remove();
+    });
+    
+    overlay.addEventListener('click', (e) => {
+      if(e.target === overlay) overlay.remove();
+    });
+    
+    overlay.querySelector('#editReps').focus();
+  }
+
+  // ------- events -------
+  $('#addBtn').addEventListener('click', () => {
+    const date = $('#date').value || todayISO();
+    const reps = Number($('#reps').value);
+    if(!reps || reps<1) return alert('Enter reps');
+    
+    const note = $('#note').value.trim();
+    const entry = { id: crypto.randomUUID(), date, reps, note, createdAt: Date.now() };
+    
+    // Check for achievements before adding
+    const oldTotal = state.entries.reduce((a,b)=>a+b.reps,0);
+    const oldTodayTotal = state.entries.filter(e=>e.date===date).reduce((a,b)=>a+b.reps,0);
+    const oldStreak = calculateStreak();
+    
+    state.entries.push(entry);
+    save(state);
+    
+    $('#reps').value = '';
+    $('#note').value = '';
+    updateTodayBadge();
+    
+    // Check achievements after adding
+    const newTodayTotal = oldTodayTotal + reps;
+    const target = Number($('#dailyTarget').value)||0;
+    
+    // Target achieved
+    if(target > 0 && oldTodayTotal < target && newTodayTotal >= target){
+      showAchievement('target', target);
+    }
+    
+    // New personal record
+    const oldHighest = state.entries.filter(e => e.id !== entry.id).length > 0 
+      ? Math.max(...state.entries.filter(e => e.id !== entry.id).map(e => e.reps))
+      : 0;
+    if(reps > oldHighest){
+      showAchievement('pr', reps);
+    }
+    
+    // New streak milestone (every 5 days)
+    const newStreak = calculateStreak();
+    if(newStreak > oldStreak && newStreak >= 5 && newStreak % 5 === 0){
+      showAchievement('streak', newStreak);
+    }
+    
+    // Total reps milestones
+    const newTotal = oldTotal + reps;
+    const milestones = [100, 250, 500, 1000, 2500, 5000, 10000];
+    for(const milestone of milestones){
+      if(oldTotal < milestone && newTotal >= milestone){
+        showAchievement('milestone', milestone);
+        break;
+      }
+    }
+  });
+
+  function updateTodayBadge(){
+    const t = totalsFor(todayISO());
+    $('#todayTotal').textContent = `Today: ${t.dayTotal}`;
+  }
+
+  $('#clearTodayBtn').addEventListener('click', () => {
+    const d = $('#date').value || todayISO();
+    if(!confirm(`Delete all entries for ${d}?`)) return;
+    state.entries = state.entries.filter(e=>e.date!==d);
+    save(state);
+  });
+
+  $('#dailyTarget').addEventListener('change', () => {
+    state.target = Number($('#dailyTarget').value)||0;
+    save(state);
+  });
+
+  $('#logContainer').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const id = btn.getAttribute('data-id');
+    
+    if(btn.classList.contains('del-btn')){
+      if(!confirm('Delete this set?')) return;
+      state.entries = state.entries.filter(x=>x.id!==id);
+      save(state);
+    }
+    
+    if(btn.classList.contains('edit-btn')){
+      showEditModal(id);
+    }
+  });
+
+  $('#expandAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.month-content').forEach(el => {
+      el.style.display = 'block';
+    });
+    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+      el.textContent = '▲';
+    });
+    document.querySelectorAll('.day-sets').forEach(el => {
+      el.style.display = 'block';
+    });
+    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      el.textContent = '▲';
+    });
+  });
+
+  $('#collapseAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.month-content').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+      el.textContent = '▼';
+    });
+    document.querySelectorAll('.day-sets').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      el.textContent = '▼';
+    });
+  });
+
+  // Export/Import/Reset
+  $('#exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pushup-tracker.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('#importBtn').addEventListener('click', async () => {
+    const f = $('#importFile').files[0];
+    if(!f) return alert('Choose a JSON file first');
+    
+    const text = await f.text();
+    try{
+      const data = JSON.parse(text);
+      
+      // Validate imported data
+      if(!data || typeof data !== 'object'){
+        throw new Error('Invalid file format');
+      }
+      
+      if(!Array.isArray(data.entries)){
+        throw new Error('Missing or invalid entries array');
+      }
+      
+      // Validate each entry has required fields
+      for(const entry of data.entries){
+        if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
+          throw new Error('Invalid entry format in file');
+        }
+      }
+      
+      // Create backup before import
+      const currentData = localStorage.getItem(KEY);
+      if(currentData){
+        localStorage.setItem(BACKUP_KEY, currentData);
+      }
+      
+      state = { 
+        entries: data.entries, 
+        target: Number(data.target) || 30,
+        lastStreak: data.lastStreak || 0
+      };
+      save(state);
+      alert('Import successful!');
+      
+    }catch(err){ 
+      alert('Import failed: ' + err.message + '\n\nPlease check the file format and try again.'); 
+    }
+  });
+
+  $('#resetBtn').addEventListener('click', () => {
+    // Show warning modal with double confirmation
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
+        <div class="warning-banner">
+          <div>
+            <strong>Warning:</strong> This will permanently delete all your push-up data including ${state.entries.length} sets and ${state.entries.reduce((a,b)=>a+b.reps,0)} total reps.
+          </div>
+        </div>
+        <p style="color:var(--muted);margin:16px 0">This action cannot be undone. A backup will be created automatically, but we recommend exporting your data first.</p>
+        <label style="display:flex;align-items:center;gap:8px;margin:20px 0;cursor:pointer">
+          <input type="checkbox" id="confirmReset" style="width:auto;margin:0" />
+          <span>I understand this will delete all my data</span>
+        </label>
+        <div class="modal-buttons">
+          <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+          <button class="primary" onclick="location.href='#'">Export First</button>
+          <button class="danger" id="confirmResetBtn" disabled>Delete Everything</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const checkbox = overlay.querySelector('#confirmReset');
+    const confirmBtn = overlay.querySelector('#confirmResetBtn');
+    
+    checkbox.addEventListener('change', () => {
+      confirmBtn.disabled = !checkbox.checked;
+    });
+    
+    overlay.querySelector('.primary').addEventListener('click', (e) => {
+      e.preventDefault();
+      $('#exportBtn').click();
+    });
+    
+    confirmBtn.addEventListener('click', () => {
+      // Create backup before reset
+      const currentData = localStorage.getItem(KEY);
+      if(currentData){
+        localStorage.setItem(BACKUP_KEY, currentData);
+      }
+      
+      state = { entries: [], target: 30, lastStreak: 0 };
+      save(state);
+      overlay.remove();
+      
+      // Show confirmation
+      const successOverlay = document.createElement('div');
+      successOverlay.className = 'modal-overlay';
+      successOverlay.innerHTML = `
+        <div class="modal" style="text-align:center">
+          <div style="font-size:48px;margin-bottom:16px">✓</div>
+          <h3>Data Reset Complete</h3>
+          <p style="color:var(--muted);margin:16px 0">All data has been deleted. A backup was saved automatically.</p>
+          <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
+        </div>
+      `;
+      document.body.appendChild(successOverlay);
+      setTimeout(() => successOverlay.remove(), 3000);
+    });
+    
+    overlay.addEventListener('click', (e) => {
+      if(e.target === overlay) overlay.remove();
+    });
+  });
+
+  $('#chartDays').addEventListener('change', () => {
+    renderChart();
+  });
+
+  // init
+  $('#date').value = todayISO();
+  updateTodayBadge();
+  render();
+  </script>
+</body>
+</html>
