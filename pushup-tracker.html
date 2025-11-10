@@ -80,8 +80,8 @@
     @media (max-width:1023px) and (min-width: 768px){.key-stats-grid{grid-template-columns:repeat(2,1fr)}}
     @media (max-width:767px){.key-stats-grid{grid-template-columns:1fr}}
     
-    /* New PR grid: 2 columns */
-    .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    /* New PR grid: 3 columns fluid on large screens, stacks on mobile */
+    .pr-grid{display:grid;grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));gap:20px}
     
     .status{font-weight:600;font-size:32px}
     /* Reduced font size for smaller status metrics that are likely to wrap */
@@ -192,10 +192,16 @@
     <!-- NEW SECTION: PERSONAL RECORDS (PRs) -->
     <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
         <h2 id="prH">Personal Records (PRs)</h2>
-        <div class="pr-grid">
+        <!-- UPDATED: Changed to a 3-column grid -->
+        <div class="pr-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
             <div>
               <label>Highest Single Set 💪</label>
               <div class="status ok" id="highestSet">0</div>
+            </div>
+            <!-- NEW: Highest Daily Total -->
+            <div>
+              <label>Highest Daily Total 🚀</label>
+              <div class="status ok" id="highestDailyTotal">0</div>
             </div>
             <div>
               <label>Highest Weekly Total 🏆</label>
@@ -339,8 +345,8 @@
         emailjs.init(EMAILJS_PUBLIC_KEY);
     }
 
-    // UPDATED STATE: Added highestWeeklyTotal
-    let state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0 };
+    // UPDATED STATE: Added highestDailyTotal alongside highestWeeklyTotal
+    let state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
     let isStorageReady = false; 
     let chartInstance = null;
     let renderDebounceTimer = null;
@@ -405,17 +411,18 @@
             entries: loadedState.entries || [],
             target: loadedState.target || 30,
             lastStreak: loadedState.lastStreak || 0,
-            highestWeeklyTotal: loadedState.highestWeeklyTotal || 0, // Initialize new field
+            highestWeeklyTotal: loadedState.highestWeeklyTotal || 0,
+            highestDailyTotal: loadedState.highestDailyTotal || 0, // Initialize new field
           };
           console.log('Loaded state from localStorage.');
         } else {
           // No data found, use defaults
-          state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0 };
+          state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
           console.log('Using default state.');
         }
       } catch (error) {
         console.error('Error loading state from localStorage:', error);
-        state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0 };
+        state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
       }
     }
 
@@ -529,8 +536,9 @@
       try {
         loadState();
         
-        // NEW FIX: Calculate highest weekly total based on all historical data right after loading
+        // FIXES: Calculate highest PRs based on all historical data right after loading
         calculateHighestWeeklyTotal(state.entries); 
+        calculateHighestDailyTotal(state.entries);
 
         isStorageReady = true;
         $('#storageInfo').textContent = 'Local Storage (This Device)';
@@ -577,6 +585,35 @@
       const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
       const all = state.entries.reduce((a,b)=>a+b.reps,0);
       return { dayTotal, weekTotal, all };
+    }
+    
+    // NEW FUNCTION: Calculates the all-time highest daily total from scratch
+    function calculateHighestDailyTotal(entries) {
+        if (entries.length === 0) {
+            state.highestDailyTotal = 0;
+            return;
+        }
+
+        // 1. Group entries by date
+        const dailyTotals = {};
+        for (const entry of entries) {
+            dailyTotals[entry.date] = (dailyTotals[entry.date] || 0) + entry.reps;
+        }
+
+        // 2. Find the maximum total across all recorded days
+        const maxDailyTotal = Math.max(...Object.values(dailyTotals));
+        
+        // 3. Update the state if a new all-time high is found
+        if (maxDailyTotal > state.highestDailyTotal) {
+             state.highestDailyTotal = maxDailyTotal;
+        }
+        
+        // Edge case: If current highest is 0 and we have data, use the max.
+        if (state.highestDailyTotal === 0 && maxDailyTotal > 0) {
+            state.highestDailyTotal = maxDailyTotal;
+        }
+        
+        console.log('Recalculated highest daily total:', state.highestDailyTotal);
     }
     
     // NEW FUNCTION: Calculates the all-time highest weekly total from scratch
@@ -670,6 +707,10 @@
         emoji = '💪';
         title = 'New Personal Record!';
         message = `${value} reps in a single set! That's your best yet!`;
+      } else if(type === 'daily_pr'){
+        emoji = '🚀';
+        title = 'New Daily Record!';
+        message = `${value} reps in a single day! That's your highest daily total yet!`;
       } else if(type === 'weekly_pr'){
         emoji = '🥇';
         title = 'New Weekly Record!';
@@ -724,7 +765,8 @@
       $('#totalSets').textContent = state.entries.length;
       $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
       
-      // Update new highest weekly total display
+      // Update new highest daily/weekly total displays
+      $('#highestDailyTotal').textContent = state.highestDailyTotal;
       $('#highestWeeklyTotal').textContent = state.highestWeeklyTotal;
 
       // Weekly comparison
@@ -789,7 +831,8 @@
       $('#dailyTarget').value = state.target;
 
       // Check if we need full re-render or just stats update
-      const stateStr = JSON.stringify(state.entries) + state.highestWeeklyTotal; // Include new state variable
+      // Include new state variables in string check
+      const stateStr = JSON.stringify(state.entries) + state.highestWeeklyTotal + state.highestDailyTotal; 
       const needsFullRender = stateStr !== lastRenderedState;
       
       if(needsFullRender){
@@ -1155,10 +1198,10 @@
       
       const newState = { ...state, entries: [...state.entries, entry] };
       
-      // Update highest weekly total right after adding the entry to see if the current week set a new record
+      // Update PRs that rely on historical or current data
+      calculateHighestDailyTotal(newState.entries);
       updateWeeklyComparison(); 
-
-      // saveState is now synchronous (note: updateWeeklyComparison mutates state.highestWeeklyTotal)
+      // saveState is now synchronous (note: PR calculation functions mutate state)
       saveState(newState); 
       
       $('#reps').value = '';
@@ -1177,6 +1220,12 @@
       // New personal record (Highest Set)
       if(reps > oldHighestSet){
         showAchievement('pr', reps);
+      }
+      
+      // New personal record (Highest Daily Total)
+      if(newTodayTotal > state.highestDailyTotal){
+         showAchievement('daily_pr', newTodayTotal);
+         // Note: state.highestDailyTotal was updated by calculateHighestDailyTotal
       }
       
       // New streak milestone (every 5 days)
@@ -1389,6 +1438,7 @@
           target: Number(data.target) || 30,
           lastStreak: data.lastStreak || 0,
           highestWeeklyTotal: Number(data.highestWeeklyTotal) || 0,
+          highestDailyTotal: Number(data.highestDailyTotal) || 0, // Include daily total in import
         };
 
         // saveState is now synchronous
@@ -1492,7 +1542,7 @@
       
       confirmBtn.addEventListener('click', () => {
         // Reset state to empty defaults and save to storage
-        const newState = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0 };
+        const newState = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
         // saveState is now synchronous
         saveState(newState); 
         
