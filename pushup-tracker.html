@@ -257,10 +257,13 @@
         messagingSenderId: "mock-sender-id",
         appId: "mock-app-id",
     };
+    
+    // Check if we are running in the environment where real config is provided
+    const IS_LIVE_ENV = typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId !== 'mock-project-id';
 
     // Use environment variables if available, otherwise use default mock config
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+    const firebaseConfig = IS_LIVE_ENV 
       ? JSON.parse(__firebase_config) 
       : DEFAULT_CONFIG;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -272,7 +275,27 @@
     let isAuthReady = false;
 
     // --- State and Helpers ---
-    let state = { entries: [], target: 30, lastStreak: 0 };
+    // If not in a live environment, try to use localStorage to store data for a smooth offline experience.
+    const localStorageKey = `${appId}_local_state`;
+    function loadLocalState() {
+        try {
+            const data = localStorage.getItem(localStorageKey);
+            return data ? JSON.parse(data) : { entries: [], target: 30, lastStreak: 0 };
+        } catch (e) {
+            console.error("Failed to load local state:", e);
+            return { entries: [], target: 30, lastStreak: 0 };
+        }
+    }
+    function saveLocalState(newState) {
+        try {
+            localStorage.setItem(localStorageKey, JSON.stringify(newState));
+        } catch (e) {
+            console.error("Failed to save local state:", e);
+        }
+    }
+
+    // Initialize state. If IS_LIVE_ENV is false, state starts in a disconnected, local-storage only mode.
+    let state = loadLocalState(); 
     let chartInstance = null;
     let renderDebounceTimer = null;
     let lastRenderedState = null;
@@ -302,39 +325,45 @@
         document.querySelectorAll('[data-section]').forEach(el => {
             el.style.display = show ? 'grid' : 'none';
         });
+        
+        // Update storage info pill
+        $('#storageInfo').textContent = IS_LIVE_ENV ? (isAuthReady ? 'Firestore' : 'Connecting...') : 'Local/Offline Mode';
     }
 
     // --- Storage Functions ---
 
     /**
-     * Attempts to save the current state to Firestore.
-     * Uses exponential backoff for retries.
+     * Attempts to save the current state. Uses Firestore if connected, otherwise uses localStorage.
      * @param {object} newState - The state object to save.
      */
     async function saveState(newState) {
-      const docRef = getDocRef();
-      if (!docRef) {
-        console.error("Firestore not ready. Cannot save state.");
-        return;
-      }
-      
-      const MAX_RETRIES = 5;
-      for (let i = 0; i < MAX_RETRIES; i++) {
-        try {
-          // Use setDoc to overwrite the single document with the entire state
-          await setDoc(docRef, newState);
-          // Note: No need to call render(), onSnapshot listener handles real-time updates.
+      if (IS_LIVE_ENV && isAuthReady) {
+        const docRef = getDocRef();
+        if (!docRef) {
+          console.error("Firestore not ready. Cannot save state.");
           return;
-        } catch (error) {
-          console.error(`Save attempt ${i + 1} failed:`, error);
-          if (i === MAX_RETRIES - 1) {
-            console.error("Failed to save state to Firestore after multiple retries.");
-            // Replaced alert with console error as per guidelines
-            return;
-          }
-          const delay = Math.pow(2, i) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
         }
+        
+        const MAX_RETRIES = 5;
+        for (let i = 0; i < MAX_RETRIES; i++) {
+          try {
+            await setDoc(docRef, newState);
+            return;
+          } catch (error) {
+            console.error(`Save attempt ${i + 1} failed:`, error);
+            if (i === MAX_RETRIES - 1) {
+              console.error("Failed to save state to Firestore after multiple retries.");
+              return;
+            }
+            const delay = Math.pow(2, i) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      } else {
+        // Fallback for offline/mock mode
+        state = newState; // Directly update the state object
+        saveLocalState(newState); // Save to local storage
+        scheduleRender(); // Manually trigger render since no onSnapshot is active
       }
     }
 
@@ -346,20 +375,29 @@
       if (!docRef) return;
 
       try {
-        const localData = localStorage.getItem(KEY);
-        if (localData) {
+        // Check for old v1 data (from the file before Firebase)
+        const v1LocalData = localStorage.getItem(KEY); 
+        
+        // Check for current local data (from offline mode)
+        const currentLocalData = localStorage.getItem(localStorageKey);
+
+        const dataToMigrate = v1LocalData || currentLocalData;
+
+        if (dataToMigrate) {
           const remoteDoc = await getDoc(docRef);
           
           if (!remoteDoc.exists()) {
             // Only migrate if Firestore document is empty
-            const oldState = JSON.parse(localData);
-            console.log("Migrating data from localStorage to Firestore...");
+            const oldState = JSON.parse(dataToMigrate);
+            console.log("Migrating data from local storage to Firestore...");
             await setDoc(docRef, oldState);
-            localStorage.removeItem(KEY); // Clear local storage after successful migration
+            localStorage.removeItem(KEY); // Clear old V1 key
+            localStorage.removeItem(localStorageKey); // Clear local offline key
             console.log("Migration complete.");
           } else {
-            // Remote data exists, clear old local data to prevent confusion
+            // Remote data exists, clear local data to prevent confusion
             localStorage.removeItem(KEY);
+            localStorage.removeItem(localStorageKey);
           }
         }
       } catch (e) {
@@ -374,23 +412,19 @@
       const docRef = getDocRef();
       if (!docRef) return;
       
-      // onSnapshot listener handles real-time data updates
       onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           state = docSnap.data();
-          state.entries = state.entries || []; // Ensure entries array exists
+          state.entries = state.entries || []; 
         } else {
-          // Document does not exist, initialize with default state and save to Firestore
           state = { entries: [], target: Number($('#dailyTarget').value) || 30, lastStreak: 0 };
           saveState(state); // Create the document
         }
         console.log("Firestore data updated. Rendering...");
-        // Re-render the application UI with the new state
         render();
-        toggleContent(true); // Show content once initial data is loaded
+        toggleContent(true); 
       }, (error) => {
         console.error("Firestore listen failed:", error);
-        // Show content even on listen error if auth succeeded
         toggleContent(true); 
       });
     }
@@ -398,14 +432,29 @@
     // --- Auth & Init ---
 
     async function initFirebaseAndAuth() {
-      setLogLevel('debug'); // Enable detailed Firebase logging
+      
+      if (!IS_LIVE_ENV) {
+        // --- OFFLINE MODE START ---
+        console.warn("Running in OFFLINE/MOCK mode. Data will be stored only in this browser's local storage and will not sync.");
+        userId = 'OFFLINE-USER-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+        $('#userIdDisplay').textContent = userId;
+        isAuthReady = true;
+        
+        // Since there is no listener, render the initial local state
+        render(); 
+        toggleContent(true);
+        return;
+        // --- OFFLINE MODE END ---
+      }
+      
+      // --- LIVE MODE START ---
+      setLogLevel('debug'); 
       
       try {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
         
-        // Wait for auth state to be ready
         await new Promise(resolve => {
           onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -414,12 +463,10 @@
               isAuthReady = true;
               console.log("Auth ready. User ID:", userId);
               
-              // Only run migration and setup listener once auth is ready
               await migrateLocalStorage();
               setupFirestoreListener();
               resolve();
             } else {
-              // Sign in anonymously if no token, or if token failed
               if (initialAuthToken) {
                 try {
                   await signInWithCustomToken(auth, initialAuthToken);
@@ -436,12 +483,27 @@
 
       } catch (error) {
         console.error("Firebase initialization failed:", error);
-        $('#loadingIndicator').textContent = "Error loading app. Check console for details.";
+        $('#loadingIndicator').innerHTML = `
+            Error loading app (Live Mode): ${error.message}. <br>
+            Please check your configuration or try running the app in a live environment.
+        `;
         toggleContent(false);
       }
+      // --- LIVE MODE END ---
+    }
+    
+    // Debounced render for performance (only used in offline mode)
+    function scheduleRender(){
+      if(renderDebounceTimer){
+        clearTimeout(renderDebounceTimer);
+      }
+      renderDebounceTimer = setTimeout(() => {
+        render();
+        renderDebounceTimer = null;
+      }, 50);
     }
 
-    // --- Core Application Logic (Mostly unchanged, modified to use new saveState) ---
+    // --- Core Application Logic (mostly unchanged) ---
 
     function wkRange(d){
       const dt = new Date(d);
@@ -989,7 +1051,7 @@
       const oldStreak = calculateStreak();
       
       const newState = { ...state, entries: [...state.entries, entry] };
-      saveState(newState); // Push new state to Firestore
+      saveState(newState); // Push new state to Firestore / LocalStorage
       
       $('#reps').value = '';
       $('#note').value = '';
@@ -1211,7 +1273,6 @@
         // Validate each entry has required fields
         for(const entry of data.entries){
           if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
-            // FIX: Corrected the redundant 'new new Error()' to 'new Error()'
             throw new Error('Invalid entry format in file');
           }
         }
@@ -1231,7 +1292,7 @@
           <div class="modal" style="text-align:center">
             <div style="font-size:48px;margin-bottom:16px">✓</div>
             <h3>Import Successful</h3>
-            <p style="color:var(--muted);margin:16px 0">Data imported and saved to Firestore.</p>
+            <p style="color:var(--muted);margin:16px 0">Data imported and saved to storage.</p>
             <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
           </div>
         `;
@@ -1259,12 +1320,16 @@
       // Show warning modal with double confirmation
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
+      
+      const totalReps = state.entries.reduce((a,b)=>a+b.reps,0);
+      const storageType = IS_LIVE_ENV ? "Firestore" : "Local Storage";
+
       overlay.innerHTML = `
         <div class="modal">
           <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
           <div class="warning-banner">
             <div>
-              <strong>Warning:</strong> This will permanently delete all your push-up data (${state.entries.length} sets, ${state.entries.reduce((a,b)=>a+b.reps,0)} reps) from Firestore.
+              <strong>Warning:</strong> This will permanently delete all your push-up data (${state.entries.length} sets, ${totalReps} reps) from ${storageType}.
             </div>
           </div>
           <p style="color:var(--muted);margin:16px 0">This action cannot be undone. We recommend exporting your data first.</p>
@@ -1295,9 +1360,9 @@
       });
       
       confirmBtn.addEventListener('click', async () => {
-        // Reset state to empty defaults and save to Firestore
+        // Reset state to empty defaults and save to storage
         const newState = { entries: [], target: 30, lastStreak: 0 };
-        await saveState(newState); // This overwrites the Firestore document
+        await saveState(newState); // This overwrites the document/local storage
         
         overlay.remove();
         
@@ -1308,7 +1373,7 @@
           <div class="modal" style="text-align:center">
             <div style="font-size:48px;margin-bottom:16px">✓</div>
             <h3>Data Reset Complete</h3>
-            <p style="color:var(--muted);margin:16px 0">All data has been deleted from Firestore.</p>
+            <p style="color:var(--muted);margin:16px 0">All data has been deleted from ${storageType}.</p>
             <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
           </div>
         `;
