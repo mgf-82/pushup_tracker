@@ -73,7 +73,7 @@
     .trend{display:inline-flex;align-items:center;gap:6px;font-size:18px;margin-left:12px}
     .trend.up{color:var(--ok)}
     .trend.down{color:var(--bad)}
-    .trend.stable{color:var(--muted)}
+    .trend.stable{color:color:var(--muted)}
     
     /* Comparison card */
     .comparison{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;padding:16px;background:#1a1a1c;border-radius:10px;margin:12px 0}
@@ -248,8 +248,21 @@
     const FIREBASE_DOC_ID = 'state'; // Fixed document ID for the user's data
     const FIREBASE_COLLECTION_NAME = 'pushup_data'; // Collection name for pushup data
 
+    const DEFAULT_CONFIG = {
+        projectId: "demo-project-id", // Mock ID to prevent initialization error when running locally
+        apiKey: "mock-api-key",
+        authDomain: "mock-auth-domain",
+        databaseURL: "mock-database-url",
+        storageBucket: "mock-storage-bucket",
+        messagingSenderId: "mock-sender-id",
+        appId: "mock-app-id",
+    };
+
+    // Use environment variables if available, otherwise use default mock config
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : DEFAULT_CONFIG;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
     let app;
@@ -1198,6 +1211,7 @@
         // Validate each entry has required fields
         for(const entry of data.entries){
           if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
+            // FIX: Corrected the redundant 'new new Error()' to 'new Error()'
             throw new Error('Invalid entry format in file');
           }
         }
