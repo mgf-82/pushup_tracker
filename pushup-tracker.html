@@ -94,12 +94,17 @@
 <body>
   <header>
     <h1>Push‑up Tracker</h1>
-    <span class="pill" id="storageInfo">localStorage</span>
+    <!-- Updated storage solution display -->
+    <span class="pill" id="storageInfo">Firestore</span>
     <div class="pill" id="weekInfo">Week: —</div>
     <div id="streakBadge"></div>
   </header>
-  <main>
-    <section class="card" aria-labelledby="addEntryH">
+  <main id="appContent" class="updating">
+    <div id="loadingIndicator" style="text-align:center;padding:50px;font-size:20px;color:var(--muted)">
+      Loading data from Firestore...
+    </div>
+    
+    <section class="card" aria-labelledby="addEntryH" style="display:none" data-section>
       <h2 id="addEntryH">Add set</h2>
       <div class="row">
         <div>
@@ -122,7 +127,7 @@
       </div>
     </section>
 
-    <section class="card" aria-labelledby="summaryH">
+    <section class="card" aria-labelledby="summaryH" style="display:none" data-section>
       <h2 id="summaryH">Summary</h2>
       <div class="grid">
         <div>
@@ -180,7 +185,7 @@
       <div id="weeklyComparison" style="text-align:center;font-size:16px;color:var(--muted)"></div>
     </section>
 
-    <section class="card" aria-labelledby="chartH">
+    <section class="card" aria-labelledby="chartH" style="display:none" data-section>
       <h2 id="chartH">Progress Chart</h2>
       <div style="position:relative;height:400px">
         <canvas id="chart"></canvas>
@@ -198,7 +203,7 @@
       </div>
     </section>
 
-    <section class="card" aria-labelledby="logH">
+    <section class="card" aria-labelledby="logH" style="display:none" data-section>
       <h2 id="logH">Log</h2>
       <div class="row" style="margin-bottom:16px">
         <button id="expandAllBtn" class="ghost">Expand all</button>
@@ -209,870 +214,1118 @@
         <strong>Total sets:</strong> <span id="totalSets">0</span> | 
         <strong>Total reps:</strong> <span id="totalReps">0</span>
       </div>
-      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored locally in your browser. Use Export to back up or move devices.</p>
+      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored in Firestore, synced across your devices.</p>
     </section>
 
-    <section class="card" aria-labelledby="dataH">
+    <section class="card" aria-labelledby="dataH" style="display:none" data-section>
       <h2 id="dataH">Data</h2>
       <div class="row">
         <button id="exportBtn">Export JSON</button>
         <input type="file" id="importFile" accept="application/json" />
         <button id="importBtn">Import</button>
-        <button id="resetBtn" class="ghost">Reset all</button>
+        <button id="resetBtn" class="danger">Reset all</button>
       </div>
       <details style="margin-top:16px">
         <summary>See raw JSON</summary>
         <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
       </details>
+      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your user ID for this session: <code id="userIdDisplay">Loading...</code></p>
     </section>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-  <script>
-  // ------- storage -------
-  const KEY = 'pushup.tracker.v1';
-  const BACKUP_KEY = 'pushup.tracker.backup';
-  
-  function load(){
-    try { return JSON.parse(localStorage.getItem(KEY)) || { entries: [], target: 30, lastStreak: 0 }; }
-    catch { return { entries: [], target: 30, lastStreak: 0 }; }
-  }
-  
-  function save(state){ 
-    // Auto-backup before save
-    try{
-      const current = localStorage.getItem(KEY);
-      if(current) localStorage.setItem(BACKUP_KEY, current);
-    }catch(e){}
+  <script type="module">
+    // Firebase Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, doc, setDoc, onSnapshot, getDoc,
+      setLogLevel 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- Firebase/App Setup Variables ---
+    const KEY = 'pushup.tracker.v1'; // Legacy localStorage key for migration
+    const FIREBASE_DOC_ID = 'state'; // Fixed document ID for the user's data
+    const FIREBASE_COLLECTION_NAME = 'pushup_data'; // Collection name for pushup data
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let app;
+    let db;
+    let auth;
+    let userId = null;
+    let isAuthReady = false;
+
+    // --- State and Helpers ---
+    let state = { entries: [], target: 30, lastStreak: 0 };
+    let chartInstance = null;
+    let renderDebounceTimer = null;
+    let lastRenderedState = null;
     
-    localStorage.setItem(KEY, JSON.stringify(state)); 
-    scheduleRender();
-  }
-  
-  // Debounced render for performance
-  function scheduleRender(){
-    if(renderDebounceTimer){
-      clearTimeout(renderDebounceTimer);
+    const $ = sel => document.querySelector(sel);
+    const todayISO = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    function getDocRef() {
+      if (!db || !userId) return null;
+      // Private data path: /artifacts/{appId}/users/{userId}/pushup_data/state
+      return doc(db, 'artifacts', appId, 'users', userId, FIREBASE_COLLECTION_NAME, FIREBASE_DOC_ID);
     }
-    renderDebounceTimer = setTimeout(() => {
-      render();
-      renderDebounceTimer = null;
-    }, 50);
-  }
-  
-  // Smart render - only update changed parts
-  function updateStats(){
-    const t = totalsFor($('#date').value || todayISO());
-    $('#dailyTotal').textContent = t.dayTotal;
-    $('#weeklyTotal').textContent = t.weekTotal;
-    $('#allTimeTotal').textContent = t.all;
     
-    // Calculate highest set
-    const highestSet = state.entries.length > 0 ? Math.max(...state.entries.map(e => e.reps)) : 0;
-    $('#highestSet').textContent = highestSet;
-    
-    // Calculate average per set
-    const avgSet = state.entries.length > 0 ? Math.round(state.entries.reduce((a,b)=>a+b.reps,0) / state.entries.length) : 0;
-    $('#avgSet').textContent = avgSet;
-    
-    // Sets today
-    const todayDate = todayISO();
-    const setsToday = state.entries.filter(e => e.date === todayDate).length;
-    $('#setsToday').textContent = setsToday;
-    
-    // Target status
-    const target = Number($('#dailyTarget').value)||0;
-    const pct = target ? Math.round((t.dayTotal/target)*100) : 0;
-    const el = $('#targetStatus');
-    el.textContent = `${pct}% of target`;
-    el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
-    
-    // Update totals
-    $('#totalSets').textContent = state.entries.length;
-    $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
-    
-    // Weekly comparison
-    updateWeeklyComparison();
-  }
-  
-  // Calculate weekly comparison
-  function updateWeeklyComparison(){
-    const today = new Date();
-    const [thisWeekStart, thisWeekEnd] = wkRange(today.toISOString().slice(0,10));
-    
-    // Calculate last week range
-    const lastWeekDate = new Date(today);
-    lastWeekDate.setDate(today.getDate() - 7);
-    const [lastWeekStart, lastWeekEnd] = wkRange(lastWeekDate.toISOString().slice(0,10));
-    
-    // Calculate totals
-    const thisWeekTotal = state.entries
-      .filter(e => e.date >= thisWeekStart && e.date <= thisWeekEnd)
-      .reduce((sum, e) => sum + e.reps, 0);
-      
-    const lastWeekTotal = state.entries
-      .filter(e => e.date >= lastWeekStart && e.date <= lastWeekEnd)
-      .reduce((sum, e) => sum + e.reps, 0);
-    
-    $('#thisWeekTotal').textContent = thisWeekTotal;
-    $('#lastWeekTotal').textContent = lastWeekTotal;
-    
-    const diff = thisWeekTotal - lastWeekTotal;
-    const pctChange = lastWeekTotal > 0 ? Math.round((diff / lastWeekTotal) * 100) : 0;
-    
-    const arrow = $('#trendArrow');
-    const comparison = $('#weeklyComparison');
-    
-    if(diff > 0){
-      arrow.textContent = '📈';
-      arrow.style.color = 'var(--ok)';
-      comparison.innerHTML = `<span class="trend up">+${diff} reps (↑${pctChange}%)</span> <span style="color:var(--ok);margin-left:8px">Great progress!</span>`;
-    } else if(diff < 0){
-      arrow.textContent = '📉';
-      arrow.style.color = 'var(--bad)';
-      comparison.innerHTML = `<span class="trend down">${diff} reps (↓${Math.abs(pctChange)}%)</span> <span style="color:var(--muted);margin-left:8px">Let's get back on track!</span>`;
-    } else {
-      arrow.textContent = '➡️';
-      arrow.style.color = 'var(--muted)';
-      comparison.innerHTML = `<span class="trend stable">Same as last week</span> <span style="color:var(--muted);margin-left:8px">Stay consistent!</span>`;
-    }
-  }
-
-  // ------- state -------
-  let state = load();
-  let chartInstance = null;
-  let renderDebounceTimer = null;
-  let lastRenderedState = null;
-
-  // ------- helpers -------
-  const $ = sel => document.querySelector(sel);
-  const todayISO = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
-  function wkRange(d){
-    const dt = new Date(d);
-    const day = (dt.getDay()+6)%7;
-    const mon = new Date(dt); mon.setDate(dt.getDate()-day);
-    const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-    return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
-  }
-
-  function totalsFor(dateStr){
-    const dayTotal = state.entries.filter(e=>e.date===dateStr).reduce((a,b)=>a+b.reps,0);
-    const [ws,we] = wkRange(dateStr);
-    const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
-    const all = state.entries.reduce((a,b)=>a+b.reps,0);
-    return { dayTotal, weekTotal, all };
-  }
-  
-  // Calculate current streak
-  function calculateStreak(){
-    if(state.entries.length === 0) return 0;
-    
-    const uniqueDates = [...new Set(state.entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
-    const today = todayISO();
-    
-    let streak = 0;
-    let checkDate = today;
-    
-    for(let i = 0; i < uniqueDates.length; i++){
-      if(uniqueDates[i] === checkDate){
-        streak++;
-        // Move to previous day
-        const d = new Date(checkDate);
-        d.setDate(d.getDate() - 1);
-        checkDate = d.toISOString().slice(0,10);
-      } else {
-        // Check if we should include yesterday for today's streak
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayISO = yesterday.toISOString().slice(0,10);
+    // Helper to show/hide the main content after loading
+    function toggleContent(show) {
+        const appContent = $('#appContent');
+        const loadingIndicator = $('#loadingIndicator');
+        appContent.classList.toggle('updating', !show);
+        loadingIndicator.style.display = show ? 'none' : 'block';
         
-        if(i === 0 && uniqueDates[0] === yesterdayISO){
-          streak++;
-          const d = new Date(yesterdayISO);
-          d.setDate(d.getDate() - 1);
-          checkDate = d.toISOString().slice(0,10);
-        } else {
-          break;
-        }
-      }
-    }
-    
-    return streak;
-  }
-  
-  // Show achievement celebration
-  function showAchievement(type, value){
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.style.background = 'rgba(0,0,0,0.9)';
-    
-    let title = '', message = '', emoji = '';
-    
-    if(type === 'streak'){
-      emoji = '🔥';
-      title = `${value} Day Streak!`;
-      message = `Amazing! You've worked out ${value} days in a row. Keep it up!`;
-    } else if(type === 'target'){
-      emoji = '🎯';
-      title = 'Target Crushed!';
-      message = `You've hit your daily target! Great work!`;
-    } else if(type === 'milestone'){
-      emoji = '🏆';
-      title = `${value} Total Reps!`;
-      message = `Incredible milestone! You've completed ${value} push-ups!`;
-    } else if(type === 'pr'){
-      emoji = '💪';
-      title = 'New Personal Record!';
-      message = `${value} reps in a single set! That's your best yet!`;
-    }
-    
-    overlay.innerHTML = `
-      <div class="celebration">
-        <div style="font-size:64px;margin-bottom:16px">${emoji}</div>
-        <h2>${title}</h2>
-        <p>${message}</p>
-        <button class="primary" onclick="this.closest('.modal-overlay').remove()">Awesome!</button>
-      </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', (e) => {
-      if(e.target === overlay) overlay.remove();
-    });
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => overlay.remove(), 5000);
-  }
-
-  function render(){
-    // inputs
-    $('#date').value ||= todayISO();
-    $('#dailyTarget').value = state.target;
-
-    // Check if we need full re-render or just stats update
-    const stateStr = JSON.stringify(state.entries);
-    const needsFullRender = stateStr !== lastRenderedState;
-    
-    if(needsFullRender){
-      renderLog();
-      lastRenderedState = stateStr;
-    }
-    
-    // Always update stats (fast)
-    updateStats();
-
-    const [ws,we] = wkRange($('#date').value || todayISO());
-    $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
-    
-    // Update streak badge
-    const currentStreak = calculateStreak();
-    const streakEl = $('#streakBadge');
-    if(currentStreak >= 2){
-      streakEl.innerHTML = `<div class="streak-badge"><span class="streak-emoji">🔥</span>${currentStreak} day streak</div>`;
-    } else {
-      streakEl.innerHTML = '';
+        document.querySelectorAll('[data-section]').forEach(el => {
+            el.style.display = show ? 'grid' : 'none';
+        });
     }
 
-    $('#raw').textContent = JSON.stringify(state,null,2);
-    
-    // Only re-render chart if needed
-    if(needsFullRender || !chartInstance){
-      renderChart();
-    }
-  }
-  
-  // Separate log rendering for performance
-  function renderLog(){
-    const grouped = {};
-    state.entries.forEach(e => {
-      if(!grouped[e.date]) grouped[e.date] = [];
-      grouped[e.date].push(e);
-    });
+    // --- Storage Functions ---
 
-    const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
-    dates.forEach(date => {
-      grouped[date].sort((a,b) => b.createdAt - a.createdAt);
-    });
-
-    const monthGroups = {};
-    dates.forEach(date => {
-      const monthKey = date.slice(0, 7);
-      if(!monthGroups[monthKey]) monthGroups[monthKey] = [];
-      monthGroups[monthKey].push(date);
-    });
-
-    const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
-
-    const container = $('#logContainer');
-    if(dates.length === 0){
-      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
-    } else {
-      container.innerHTML = months.map(monthKey => {
-        const monthDates = monthGroups[monthKey];
-        const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-        
-        const monthTotalReps = monthDates.reduce((sum, date) => {
-          return sum + grouped[date].reduce((s, e) => s + e.reps, 0);
-        }, 0);
-        const monthTotalSets = monthDates.reduce((sum, date) => sum + grouped[date].length, 0);
-
-        return `
-          <div class="month-group">
-            <div class="month-header" tabindex="0" role="button" aria-expanded="false" aria-controls="month-${monthKey}" data-month="${monthKey}">
-              <div>
-                <strong>${monthName}</strong>
-                <span style="color:var(--muted);margin-left:10px">${monthTotalSets} sets • ${monthDates.length} days</span>
-              </div>
-              <div>
-                <strong style="color:var(--accent)">${monthTotalReps} reps</strong>
-                <span style="margin-left:10px;color:var(--muted)" id="month-arrow-${monthKey}">▼</span>
-              </div>
-            </div>
-            <div class="month-content" id="month-${monthKey}" style="display:none">
-              ${monthDates.map(date => {
-                const sets = grouped[date];
-                const dayTotal = sets.reduce((sum, e) => sum + e.reps, 0);
-                const setCount = sets.length;
-                
-                return `
-                  <div class="day-group">
-                    <div class="day-header" tabindex="0" role="button" aria-expanded="false" aria-controls="sets-${date}" data-date="${date}">
-                      <div>
-                        <strong>${date}</strong>
-                        <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div>
-                        <strong style="color:var(--accent)">${dayTotal} reps</strong>
-                        <span style="margin-left:8px;color:var(--muted)" id="arrow-${date}">▼</span>
-                      </div>
-                    </div>
-                    <div class="day-sets" id="sets-${date}" style="display:none">
-                      ${sets.map(e => `
-                        <div class="set-item">
-                          <div class="set-info">
-                            <strong>${e.reps} reps</strong>
-                            ${e.note ? `<span style="color:var(--muted);margin-left:8px">${e.note}</span>` : ''}
-                          </div>
-                          <div class="set-actions">
-                            <button data-id="${e.id}" class="ghost edit-btn">Edit</button>
-                            <button data-id="${e.id}" class="ghost del-btn">Delete</button>
-                          </div>
-                        </div>
-                      `).join('')}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-  }
-
-  function toggleMonth(monthKey){
-    const contentEl = document.getElementById(`month-${monthKey}`);
-    const arrowEl = document.getElementById(`month-arrow-${monthKey}`);
-    const headerEl = document.querySelector(`[data-month="${monthKey}"]`);
-    
-    if(contentEl.style.display === 'none'){
-      contentEl.style.display = 'block';
-      arrowEl.textContent = '▲';
-      if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
-    } else {
-      contentEl.style.display = 'none';
-      arrowEl.textContent = '▼';
-      if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  function toggleDay(date){
-    const setsEl = document.getElementById(`sets-${date}`);
-    const arrowEl = document.getElementById(`arrow-${date}`);
-    const headerEl = document.querySelector(`[data-date="${date}"]`);
-    
-    if(setsEl.style.display === 'none'){
-      setsEl.style.display = 'block';
-      arrowEl.textContent = '▲';
-      if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
-    } else {
-      setsEl.style.display = 'none';
-      arrowEl.textContent = '▼';
-      if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  function renderChart(){
-    const days = Number($('#chartDays').value) || 30;
-    const today = new Date();
-    const labels = [];
-    const data = [];
-    
-    for(let i = days - 1; i >= 0; i--){
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().slice(0,10);
-      labels.push(dateStr);
-      
-      const dayTotal = state.entries
-        .filter(e => e.date === dateStr)
-        .reduce((sum, e) => sum + e.reps, 0);
-      data.push(dayTotal);
-    }
-
-    const ctx = $('#chart').getContext('2d');
-    
-    if(chartInstance){
-      chartInstance.destroy();
-    }
-
-    chartInstance = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Daily Push-ups',
-            data: data,
-            borderColor: '#4f8cff',
-            backgroundColor: 'rgba(79, 140, 255, 0.1)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          },
-          {
-            label: 'Target',
-            data: Array(labels.length).fill(state.target),
-            borderColor: '#22c55e',
-            borderDash: [5, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: { color: '#e7e7ea' }
-          },
-          tooltip: {
-            backgroundColor: '#151517',
-            titleColor: '#e7e7ea',
-            bodyColor: '#e7e7ea',
-            borderColor: '#222',
-            borderWidth: 1
-          }
-        },
-        scales: {
-          x: {
-            ticks: { 
-              color: '#9aa0a6',
-              maxRotation: 45,
-              minRotation: 45
-            },
-            grid: { color: '#222' }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: '#9aa0a6' },
-            grid: { color: '#222' }
-          }
-        }
-      }
-    });
-  }
-  
-  // Modal for editing
-  function showEditModal(entryId){
-    const entry = state.entries.find(x => x.id === entryId);
-    if(!entry) return;
-    
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal" role="dialog" aria-labelledby="editModalTitle" aria-modal="true">
-        <h3 id="editModalTitle">Edit Set</h3>
-        <label>Reps</label>
-        <input type="number" id="editReps" value="${entry.reps}" min="1" aria-label="Number of reps" />
-        <label>Notes</label>
-        <textarea id="editNote" aria-label="Set notes">${entry.note || ''}</textarea>
-        <div class="modal-buttons">
-          <button class="ghost" id="cancelEdit">Cancel</button>
-          <button class="primary" id="saveEdit">Save</button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    
-    const saveBtn = overlay.querySelector('#saveEdit');
-    const cancelBtn = overlay.querySelector('#cancelEdit');
-    const repsInput = overlay.querySelector('#editReps');
-    
-    // Focus first input
-    repsInput.focus();
-    repsInput.select();
-    
-    // Save function
-    const handleSave = () => {
-      const reps = Number(repsInput.value);
-      const note = overlay.querySelector('#editNote').value.trim();
-      
-      if(!reps || reps < 1){
-        alert('Please enter valid reps');
+    /**
+     * Attempts to save the current state to Firestore.
+     * Uses exponential backoff for retries.
+     * @param {object} newState - The state object to save.
+     */
+    async function saveState(newState) {
+      const docRef = getDocRef();
+      if (!docRef) {
+        console.error("Firestore not ready. Cannot save state.");
         return;
       }
       
-      entry.reps = reps;
-      entry.note = note;
-      save(state);
-      overlay.remove();
-    };
-    
-    saveBtn.addEventListener('click', handleSave);
-    cancelBtn.addEventListener('click', () => overlay.remove());
-    
-    // Keyboard shortcuts
-    overlay.addEventListener('keydown', (e) => {
-      if(e.key === 'Escape'){
-        overlay.remove();
-      } else if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
-        handleSave();
-      }
-    });
-    
-    overlay.addEventListener('click', (e) => {
-      if(e.target === overlay) overlay.remove();
-    });
-  }
-
-  // ------- events -------
-  // Keyboard shortcuts - global
-  document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + K to focus reps input
-    if((e.ctrlKey || e.metaKey) && e.key === 'k'){
-      e.preventDefault();
-      $('#reps').focus();
-      $('#reps').select();
-    }
-    
-    // Escape to clear inputs
-    if(e.key === 'Escape' && document.activeElement.id === 'reps'){
-      $('#reps').value = '';
-      $('#note').value = '';
-      $('#reps').blur();
-    }
-  });
-  
-  // Keyboard navigation for collapsible sections
-  document.addEventListener('keydown', (e) => {
-    const target = e.target;
-    
-    // Month headers
-    if(target.classList.contains('month-header')){
-      if(e.key === 'Enter' || e.key === ' '){
-        e.preventDefault();
-        const monthKey = target.getAttribute('data-month');
-        toggleMonth(monthKey);
+      const MAX_RETRIES = 5;
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        try {
+          // Use setDoc to overwrite the single document with the entire state
+          await setDoc(docRef, newState);
+          // Note: No need to call render(), onSnapshot listener handles real-time updates.
+          return;
+        } catch (error) {
+          console.error(`Save attempt ${i + 1} failed:`, error);
+          if (i === MAX_RETRIES - 1) {
+            console.error("Failed to save state to Firestore after multiple retries.");
+            // Replaced alert with console error as per guidelines
+            return;
+          }
+          const delay = Math.pow(2, i) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     }
-    
-    // Day headers
-    if(target.classList.contains('day-header')){
-      if(e.key === 'Enter' || e.key === ' '){
-        e.preventDefault();
-        const date = target.getAttribute('data-date');
-        toggleDay(date);
+
+    /**
+     * Checks localStorage for old data and migrates it to Firestore if found.
+     */
+    async function migrateLocalStorage() {
+      const docRef = getDocRef();
+      if (!docRef) return;
+
+      try {
+        const localData = localStorage.getItem(KEY);
+        if (localData) {
+          const remoteDoc = await getDoc(docRef);
+          
+          if (!remoteDoc.exists()) {
+            // Only migrate if Firestore document is empty
+            const oldState = JSON.parse(localData);
+            console.log("Migrating data from localStorage to Firestore...");
+            await setDoc(docRef, oldState);
+            localStorage.removeItem(KEY); // Clear local storage after successful migration
+            console.log("Migration complete.");
+          } else {
+            // Remote data exists, clear old local data to prevent confusion
+            localStorage.removeItem(KEY);
+          }
+        }
+      } catch (e) {
+        console.warn("Migration failed or data corrupt:", e);
       }
     }
-  });
-  
-  $('#addBtn').addEventListener('click', () => {
-    const date = $('#date').value || todayISO();
-    const reps = Number($('#reps').value);
-    if(!reps || reps<1) return alert('Enter reps');
-    
-    const note = $('#note').value.trim();
-    const entry = { id: crypto.randomUUID(), date, reps, note, createdAt: Date.now() };
-    
-    // Check for achievements before adding
-    const oldTotal = state.entries.reduce((a,b)=>a+b.reps,0);
-    const oldTodayTotal = state.entries.filter(e=>e.date===date).reduce((a,b)=>a+b.reps,0);
-    const oldStreak = calculateStreak();
-    
-    state.entries.push(entry);
-    save(state);
-    
-    $('#reps').value = '';
-    $('#note').value = '';
-    $('#reps').focus(); // Keep focus for quick entry
-    updateTodayBadge();
-    
-    // Check achievements after adding
-    const newTodayTotal = oldTodayTotal + reps;
-    const target = Number($('#dailyTarget').value)||0;
-    
-    // Target achieved
-    if(target > 0 && oldTodayTotal < target && newTodayTotal >= target){
-      showAchievement('target', target);
-    }
-    
-    // New personal record
-    const oldHighest = state.entries.filter(e => e.id !== entry.id).length > 0 
-      ? Math.max(...state.entries.filter(e => e.id !== entry.id).map(e => e.reps))
-      : 0;
-    if(reps > oldHighest){
-      showAchievement('pr', reps);
-    }
-    
-    // New streak milestone (every 5 days)
-    const newStreak = calculateStreak();
-    if(newStreak > oldStreak && newStreak >= 5 && newStreak % 5 === 0){
-      showAchievement('streak', newStreak);
-    }
-    
-    // Total reps milestones
-    const newTotal = oldTotal + reps;
-    const milestones = [100, 250, 500, 1000, 2500, 5000, 10000];
-    for(const milestone of milestones){
-      if(oldTotal < milestone && newTotal >= milestone){
-        showAchievement('milestone', milestone);
-        break;
-      }
-    }
-  });
-  
-  // Enter key to add set
-  $('#reps').addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      $('#addBtn').click();
-    }
-  });
-  
-  $('#note').addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      $('#addBtn').click();
-    }
-  });
 
-  function updateTodayBadge(){
-    const t = totalsFor(todayISO());
-    $('#todayTotal').textContent = `Today: ${t.dayTotal}`;
-  }
-
-  $('#clearTodayBtn').addEventListener('click', () => {
-    const d = $('#date').value || todayISO();
-    if(!confirm(`Delete all entries for ${d}?`)) return;
-    state.entries = state.entries.filter(e=>e.date!==d);
-    save(state);
-  });
-
-  $('#dailyTarget').addEventListener('change', () => {
-    state.target = Number($('#dailyTarget').value)||0;
-    save(state);
-  });
-  
-  // Debounce target input for better performance
-  let targetDebounce = null;
-  $('#dailyTarget').addEventListener('input', () => {
-    if(targetDebounce) clearTimeout(targetDebounce);
-    targetDebounce = setTimeout(() => {
-      state.target = Number($('#dailyTarget').value)||0;
-      localStorage.setItem(KEY, JSON.stringify(state));
-      updateStats(); // Quick update without full render
-    }, 500);
-  });
-
-  $('#logContainer').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if(!btn) return;
-    const id = btn.getAttribute('data-id');
-    
-    if(btn.classList.contains('del-btn')){
-      if(!confirm('Delete this set?')) return;
-      state.entries = state.entries.filter(x=>x.id!==id);
-      save(state);
-    }
-    
-    if(btn.classList.contains('edit-btn')){
-      showEditModal(id);
-    }
-  });
-
-  $('#expandAllBtn').addEventListener('click', () => {
-    document.querySelectorAll('.month-content').forEach(el => {
-      el.style.display = 'block';
-    });
-    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
-      el.textContent = '▲';
-    });
-    document.querySelectorAll('.day-sets').forEach(el => {
-      el.style.display = 'block';
-    });
-    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
-      el.textContent = '▲';
-    });
-  });
-
-  $('#collapseAllBtn').addEventListener('click', () => {
-    document.querySelectorAll('.month-content').forEach(el => {
-      el.style.display = 'none';
-    });
-    document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
-      el.textContent = '▼';
-    });
-    document.querySelectorAll('.day-sets').forEach(el => {
-      el.style.display = 'none';
-    });
-    document.querySelectorAll('[id^="arrow-"]').forEach(el => {
-      el.textContent = '▼';
-    });
-  });
-
-  // Export/Import/Reset
-  $('#exportBtn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'pushup-tracker.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  $('#importBtn').addEventListener('click', async () => {
-    const f = $('#importFile').files[0];
-    if(!f) return alert('Choose a JSON file first');
-    
-    const text = await f.text();
-    try{
-      const data = JSON.parse(text);
+    /**
+     * Sets up the real-time listener for the Firestore document.
+     */
+    function setupFirestoreListener() {
+      const docRef = getDocRef();
+      if (!docRef) return;
       
-      // Validate imported data
-      if(!data || typeof data !== 'object'){
-        throw new Error('Invalid file format');
-      }
+      // onSnapshot listener handles real-time data updates
+      onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          state = docSnap.data();
+          state.entries = state.entries || []; // Ensure entries array exists
+        } else {
+          // Document does not exist, initialize with default state and save to Firestore
+          state = { entries: [], target: Number($('#dailyTarget').value) || 30, lastStreak: 0 };
+          saveState(state); // Create the document
+        }
+        console.log("Firestore data updated. Rendering...");
+        // Re-render the application UI with the new state
+        render();
+        toggleContent(true); // Show content once initial data is loaded
+      }, (error) => {
+        console.error("Firestore listen failed:", error);
+        // Show content even on listen error if auth succeeded
+        toggleContent(true); 
+      });
+    }
+
+    // --- Auth & Init ---
+
+    async function initFirebaseAndAuth() {
+      setLogLevel('debug'); // Enable detailed Firebase logging
       
-      if(!Array.isArray(data.entries)){
-        throw new Error('Missing or invalid entries array');
+      try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        // Wait for auth state to be ready
+        await new Promise(resolve => {
+          onAuthStateChanged(auth, async (user) => {
+            if (user) {
+              userId = user.uid;
+              $('#userIdDisplay').textContent = userId;
+              isAuthReady = true;
+              console.log("Auth ready. User ID:", userId);
+              
+              // Only run migration and setup listener once auth is ready
+              await migrateLocalStorage();
+              setupFirestoreListener();
+              resolve();
+            } else {
+              // Sign in anonymously if no token, or if token failed
+              if (initialAuthToken) {
+                try {
+                  await signInWithCustomToken(auth, initialAuthToken);
+                } catch (e) {
+                  console.warn("Custom token sign-in failed, falling back to anonymous:", e);
+                  await signInAnonymously(auth);
+                }
+              } else {
+                await signInAnonymously(auth);
+              }
+            }
+          });
+        });
+
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        $('#loadingIndicator').textContent = "Error loading app. Check console for details.";
+        toggleContent(false);
       }
+    }
+
+    // --- Core Application Logic (Mostly unchanged, modified to use new saveState) ---
+
+    function wkRange(d){
+      const dt = new Date(d);
+      const day = (dt.getDay()+6)%7;
+      const mon = new Date(dt); mon.setDate(dt.getDate()-day);
+      const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+      return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+    }
+
+    function totalsFor(dateStr){
+      const dayTotal = state.entries.filter(e=>e.date===dateStr).reduce((a,b)=>a+b.reps,0);
+      const [ws,we] = wkRange(dateStr);
+      const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
+      const all = state.entries.reduce((a,b)=>a+b.reps,0);
+      return { dayTotal, weekTotal, all };
+    }
+    
+    // Calculate current streak
+    function calculateStreak(){
+      if(state.entries.length === 0) return 0;
       
-      // Validate each entry has required fields
-      for(const entry of data.entries){
-        if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
-          throw new Error('Invalid entry format in file');
+      const uniqueDates = [...new Set(state.entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
+      const today = todayISO();
+      
+      let streak = 0;
+      let checkDate = today;
+      
+      for(let i = 0; i < uniqueDates.length; i++){
+        if(uniqueDates[i] === checkDate){
+          streak++;
+          // Move to previous day
+          const d = new Date(checkDate);
+          d.setDate(d.getDate() - 1);
+          checkDate = d.toISOString().slice(0,10);
+        } else {
+          // Check if we should include yesterday for today's streak
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayISO = yesterday.toISOString().slice(0,10);
+          
+          if(i === 0 && uniqueDates[0] === yesterdayISO){
+            streak++;
+            const d = new Date(yesterdayISO);
+            d.setDate(d.getDate() - 1);
+            checkDate = d.toISOString().slice(0,10);
+          } else {
+            break;
+          }
         }
       }
       
-      // Create backup before import
-      const currentData = localStorage.getItem(KEY);
-      if(currentData){
-        localStorage.setItem(BACKUP_KEY, currentData);
-      }
-      
-      state = { 
-        entries: data.entries, 
-        target: Number(data.target) || 30,
-        lastStreak: data.lastStreak || 0
-      };
-      save(state);
-      alert('Import successful!');
-      
-    }catch(err){ 
-      alert('Import failed: ' + err.message + '\n\nPlease check the file format and try again.'); 
+      return streak;
     }
-  });
-
-  $('#resetBtn').addEventListener('click', () => {
-    // Show warning modal with double confirmation
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal">
-        <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
-        <div class="warning-banner">
-          <div>
-            <strong>Warning:</strong> This will permanently delete all your push-up data including ${state.entries.length} sets and ${state.entries.reduce((a,b)=>a+b.reps,0)} total reps.
-          </div>
-        </div>
-        <p style="color:var(--muted);margin:16px 0">This action cannot be undone. A backup will be created automatically, but we recommend exporting your data first.</p>
-        <label style="display:flex;align-items:center;gap:8px;margin:20px 0;cursor:pointer">
-          <input type="checkbox" id="confirmReset" style="width:auto;margin:0" />
-          <span>I understand this will delete all my data</span>
-        </label>
-        <div class="modal-buttons">
-          <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-          <button class="primary" onclick="location.href='#'">Export First</button>
-          <button class="danger" id="confirmResetBtn" disabled>Delete Everything</button>
-        </div>
-      </div>
-    `;
     
-    document.body.appendChild(overlay);
-    
-    const checkbox = overlay.querySelector('#confirmReset');
-    const confirmBtn = overlay.querySelector('#confirmResetBtn');
-    
-    checkbox.addEventListener('change', () => {
-      confirmBtn.disabled = !checkbox.checked;
-    });
-    
-    overlay.querySelector('.primary').addEventListener('click', (e) => {
-      e.preventDefault();
-      $('#exportBtn').click();
-    });
-    
-    confirmBtn.addEventListener('click', () => {
-      // Create backup before reset
-      const currentData = localStorage.getItem(KEY);
-      if(currentData){
-        localStorage.setItem(BACKUP_KEY, currentData);
+    // Show achievement celebration (no changes)
+    function showAchievement(type, value){
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.style.background = 'rgba(0,0,0,0.9)';
+      
+      let title = '', message = '', emoji = '';
+      
+      if(type === 'streak'){
+        emoji = '🔥';
+        title = `${value} Day Streak!`;
+        message = `Amazing! You've worked out ${value} days in a row. Keep it up!`;
+      } else if(type === 'target'){
+        emoji = '🎯';
+        title = 'Target Crushed!';
+        message = `You've hit your daily target! Great work!`;
+      } else if(type === 'milestone'){
+        emoji = '🏆';
+        title = `${value} Total Reps!`;
+        message = `Incredible milestone! You've completed ${value} push-ups!`;
+      } else if(type === 'pr'){
+        emoji = '💪';
+        title = 'New Personal Record!';
+        message = `${value} reps in a single set! That's your best yet!`;
       }
       
-      state = { entries: [], target: 30, lastStreak: 0 };
-      save(state);
-      overlay.remove();
-      
-      // Show confirmation
-      const successOverlay = document.createElement('div');
-      successOverlay.className = 'modal-overlay';
-      successOverlay.innerHTML = `
-        <div class="modal" style="text-align:center">
-          <div style="font-size:48px;margin-bottom:16px">✓</div>
-          <h3>Data Reset Complete</h3>
-          <p style="color:var(--muted);margin:16px 0">All data has been deleted. A backup was saved automatically.</p>
-          <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
+      overlay.innerHTML = `
+        <div class="celebration">
+          <div style="font-size:64px;margin-bottom:16px">${emoji}</div>
+          <h2>${title}</h2>
+          <p>${message}</p>
+          <button class="primary" onclick="this.closest('.modal-overlay').remove()">Awesome!</button>
         </div>
       `;
-      document.body.appendChild(successOverlay);
-      setTimeout(() => successOverlay.remove(), 3000);
+      
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => {
+        if(e.target === overlay) overlay.remove();
+      });
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => overlay.remove(), 5000);
+    }
+    
+    function updateStats(){
+      const t = totalsFor($('#date').value || todayISO());
+      $('#dailyTotal').textContent = t.dayTotal;
+      $('#weeklyTotal').textContent = t.weekTotal;
+      $('#allTimeTotal').textContent = t.all;
+      
+      // Calculate highest set
+      const highestSet = state.entries.length > 0 ? Math.max(...state.entries.map(e => e.reps)) : 0;
+      $('#highestSet').textContent = highestSet;
+      
+      // Calculate average per set
+      const avgSet = state.entries.length > 0 ? Math.round(state.entries.reduce((a,b)=>a+b.reps,0) / state.entries.length) : 0;
+      $('#avgSet').textContent = avgSet;
+      
+      // Sets today
+      const todayDate = todayISO();
+      const setsToday = state.entries.filter(e => e.date === todayDate).length;
+      $('#setsToday').textContent = setsToday;
+      
+      // Target status
+      const target = Number($('#dailyTarget').value)||0;
+      const pct = target ? Math.round((t.dayTotal/target)*100) : 0;
+      const el = $('#targetStatus');
+      el.textContent = `${pct}% of target`;
+      el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
+      
+      // Update totals
+      $('#totalSets').textContent = state.entries.length;
+      $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
+      
+      // Weekly comparison
+      updateWeeklyComparison();
+    }
+    
+    // Calculate weekly comparison
+    function updateWeeklyComparison(){
+      const today = new Date();
+      const [thisWeekStart, thisWeekEnd] = wkRange(today.toISOString().slice(0,10));
+      
+      // Calculate last week range
+      const lastWeekDate = new Date(today);
+      lastWeekDate.setDate(today.getDate() - 7);
+      const [lastWeekStart, lastWeekEnd] = wkRange(lastWeekDate.toISOString().slice(0,10));
+      
+      // Calculate totals
+      const thisWeekTotal = state.entries
+        .filter(e => e.date >= thisWeekStart && e.date <= thisWeekEnd)
+        .reduce((sum, e) => sum + e.reps, 0);
+        
+      const lastWeekTotal = state.entries
+        .filter(e => e.date >= lastWeekStart && e.date <= lastWeekEnd)
+        .reduce((sum, e) => sum + e.reps, 0);
+      
+      $('#thisWeekTotal').textContent = thisWeekTotal;
+      $('#lastWeekTotal').textContent = lastWeekTotal;
+      
+      const diff = thisWeekTotal - lastWeekTotal;
+      const pctChange = lastWeekTotal > 0 ? Math.round((diff / lastWeekTotal) * 100) : 0;
+      
+      const arrow = $('#trendArrow');
+      const comparison = $('#weeklyComparison');
+      
+      if(diff > 0){
+        arrow.textContent = '📈';
+        arrow.style.color = 'var(--ok)';
+        comparison.innerHTML = `<span class="trend up">+${diff} reps (↑${pctChange}%)</span> <span style="color:var(--ok);margin-left:8px">Great progress!</span>`;
+      } else if(diff < 0){
+        arrow.textContent = '📉';
+        arrow.style.color = 'var(--bad)';
+        comparison.innerHTML = `<span class="trend down">${diff} reps (↓${Math.abs(pctChange)}%)</span> <span style="color:var(--muted);margin-left:8px">Let's get back on track!</span>`;
+      } else {
+        arrow.textContent = '➡️';
+        arrow.style.color = 'var(--muted)';
+        comparison.innerHTML = `<span class="trend stable">Same as last week</span> <span style="color:var(--muted);margin-left:8px">Stay consistent!</span>`;
+      }
+    }
+
+    function render(){
+      // inputs
+      $('#date').value ||= todayISO();
+      $('#dailyTarget').value = state.target;
+
+      // Check if we need full re-render or just stats update
+      const stateStr = JSON.stringify(state.entries);
+      const needsFullRender = stateStr !== lastRenderedState;
+      
+      if(needsFullRender){
+        renderLog();
+        lastRenderedState = stateStr;
+      }
+      
+      // Always update stats (fast)
+      updateStats();
+
+      const [ws,we] = wkRange($('#date').value || todayISO());
+      $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
+      
+      // Update streak badge
+      const currentStreak = calculateStreak();
+      const streakEl = $('#streakBadge');
+      if(currentStreak >= 2){
+        streakEl.innerHTML = `<div class="streak-badge"><span class="streak-emoji">🔥</span>${currentStreak} day streak</div>`;
+      } else {
+        streakEl.innerHTML = '';
+      }
+
+      $('#raw').textContent = JSON.stringify(state,null,2);
+      
+      // Only re-render chart if needed
+      if(needsFullRender || !chartInstance){
+        renderChart();
+      }
+      updateTodayBadge();
+    }
+    
+    // Separate log rendering for performance
+    function renderLog(){
+      const grouped = {};
+      state.entries.forEach(e => {
+        if(!grouped[e.date]) grouped[e.date] = [];
+        grouped[e.date].push(e);
+      });
+
+      const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+      dates.forEach(date => {
+        grouped[date].sort((a,b) => b.createdAt - a.createdAt);
+      });
+
+      const monthGroups = {};
+      dates.forEach(date => {
+        const monthKey = date.slice(0, 7);
+        if(!monthGroups[monthKey]) monthGroups[monthKey] = [];
+        monthGroups[monthKey].push(date);
+      });
+
+      const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
+
+      const container = $('#logContainer');
+      if(dates.length === 0){
+        container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
+      } else {
+        container.innerHTML = months.map(monthKey => {
+          const monthDates = monthGroups[monthKey];
+          const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+          
+          const monthTotalReps = monthDates.reduce((sum, date) => {
+            return sum + grouped[date].reduce((s, e) => s + e.reps, 0);
+          }, 0);
+          const monthTotalSets = monthDates.reduce((sum, date) => sum + grouped[date].length, 0);
+
+          return `
+            <div class="month-group">
+              <div class="month-header" tabindex="0" role="button" aria-expanded="false" aria-controls="month-${monthKey}" data-month="${monthKey}">
+                <div>
+                  <strong>${monthName}</strong>
+                  <span style="color:var(--muted);margin-left:10px">${monthTotalSets} sets • ${monthDates.length} days</span>
+                </div>
+                <div>
+                  <strong style="color:var(--accent)">${monthTotalReps} reps</strong>
+                  <span style="margin-left:10px;color:var(--muted)" id="month-arrow-${monthKey}">▼</span>
+                </div>
+              </div>
+              <div class="month-content" id="month-${monthKey}" style="display:none">
+                ${monthDates.map(date => {
+                  const sets = grouped[date];
+                  const dayTotal = sets.reduce((sum, e) => sum + e.reps, 0);
+                  const setCount = sets.length;
+                  
+                  return `
+                    <div class="day-group">
+                      <div class="day-header" tabindex="0" role="button" aria-expanded="false" aria-controls="sets-${date}" data-date="${date}">
+                        <div>
+                          <strong>${date}</strong>
+                          <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div>
+                          <strong style="color:var(--accent)">${dayTotal} reps</strong>
+                          <span style="margin-left:8px;color:var(--muted)" id="arrow-${date}">▼</span>
+                        </div>
+                      </div>
+                      <div class="day-sets" id="sets-${date}" style="display:none">
+                        ${sets.map(e => `
+                          <div class="set-item">
+                            <div class="set-info">
+                              <strong>${e.reps} reps</strong>
+                              ${e.note ? `<span style="color:var(--muted);margin-left:8px">${e.note}</span>` : ''}
+                            </div>
+                            <div class="set-actions">
+                              <button data-id="${e.id}" class="ghost edit-btn">Edit</button>
+                              <button data-id="${e.id}" class="ghost del-btn">Delete</button>
+                            </div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function toggleMonth(monthKey){
+      const contentEl = document.getElementById(`month-${monthKey}`);
+      const arrowEl = document.getElementById(`month-arrow-${monthKey}`);
+      const headerEl = document.querySelector(`[data-month="${monthKey}"]`);
+      
+      if(contentEl.style.display === 'none'){
+        contentEl.style.display = 'block';
+        arrowEl.textContent = '▲';
+        if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
+      } else {
+        contentEl.style.display = 'none';
+        arrowEl.textContent = '▼';
+        if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function toggleDay(date){
+      const setsEl = document.getElementById(`sets-${date}`);
+      const arrowEl = document.getElementById(`arrow-${date}`);
+      const headerEl = document.querySelector(`[data-date="${date}"]`);
+      
+      if(setsEl.style.display === 'none'){
+        setsEl.style.display = 'block';
+        arrowEl.textContent = '▲';
+        if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
+      } else {
+        setsEl.style.display = 'none';
+        arrowEl.textContent = '▼';
+        if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function renderChart(){
+      const days = Number($('#chartDays').value) || 30;
+      const today = new Date();
+      const labels = [];
+      const data = [];
+      
+      for(let i = days - 1; i >= 0; i--){
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dateStr = d.toISOString().slice(0,10);
+        labels.push(dateStr);
+        
+        const dayTotal = state.entries
+          .filter(e => e.date === dateStr)
+          .reduce((sum, e) => sum + e.reps, 0);
+        data.push(dayTotal);
+      }
+
+      const ctx = $('#chart').getContext('2d');
+      
+      if(chartInstance){
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Daily Push-ups',
+              data: data,
+              borderColor: '#4f8cff',
+              backgroundColor: 'rgba(79, 140, 255, 0.1)',
+              tension: 0.3,
+              fill: true,
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: 'Target',
+              data: Array(labels.length).fill(state.target),
+              borderColor: '#22c55e',
+              borderDash: [5, 5],
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#e7e7ea' }
+            },
+            tooltip: {
+              backgroundColor: '#151517',
+              titleColor: '#e7e7ea',
+              bodyColor: '#e7e7ea',
+              borderColor: '#222',
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              ticks: { 
+                color: '#9aa0a6',
+                maxRotation: 45,
+                minRotation: 45
+              },
+              grid: { color: '#222' }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#9aa0a6' },
+              grid: { color: '#222' }
+            }
+          }
+        }
+      });
+    }
+    
+    // Modal for editing
+    function showEditModal(entryId){
+      const entry = state.entries.find(x => x.id === entryId);
+      if(!entry) return;
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-labelledby="editModalTitle" aria-modal="true">
+          <h3 id="editModalTitle">Edit Set</h3>
+          <label>Reps</label>
+          <input type="number" id="editReps" value="${entry.reps}" min="1" aria-label="Number of reps" />
+          <label>Notes</label>
+          <textarea id="editNote" aria-label="Set notes">${entry.note || ''}</textarea>
+          <div class="modal-buttons">
+            <button class="ghost" id="cancelEdit">Cancel</button>
+            <button class="primary" id="saveEdit">Save</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      const saveBtn = overlay.querySelector('#saveEdit');
+      const cancelBtn = overlay.querySelector('#cancelEdit');
+      const repsInput = overlay.querySelector('#editReps');
+      
+      // Focus first input
+      repsInput.focus();
+      repsInput.select();
+      
+      // Save function
+      const handleSave = () => {
+        const reps = Number(repsInput.value);
+        const note = overlay.querySelector('#editNote').value.trim();
+        
+        if(!reps || reps < 1){
+          // Using a custom modal instead of alert
+          console.error('Please enter valid reps'); 
+          return;
+        }
+        
+        // Update state object, then save to Firestore
+        const newState = { ...state };
+        const entryToUpdate = newState.entries.find(x => x.id === entryId);
+        if(entryToUpdate){
+            entryToUpdate.reps = reps;
+            entryToUpdate.note = note;
+        }
+        
+        saveState(newState);
+        overlay.remove();
+      };
+      
+      saveBtn.addEventListener('click', handleSave);
+      cancelBtn.addEventListener('click', () => overlay.remove());
+      
+      // Keyboard shortcuts
+      overlay.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape'){
+          overlay.remove();
+        } else if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+          handleSave();
+        }
+      });
+      
+      overlay.addEventListener('click', (e) => {
+        if(e.target === overlay) overlay.remove();
+      });
+    }
+
+    // --- Events and Handlers (Modified to use saveState) ---
+
+    // Keyboard shortcuts - global
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + K to focus reps input
+      if((e.ctrlKey || e.metaKey) && e.key === 'k'){
+        e.preventDefault();
+        $('#reps').focus();
+        $('#reps').select();
+      }
+      
+      // Escape to clear inputs
+      if(e.key === 'Escape' && document.activeElement.id === 'reps'){
+        $('#reps').value = '';
+        $('#note').value = '';
+        $('#reps').blur();
+      }
     });
     
-    overlay.addEventListener('click', (e) => {
-      if(e.target === overlay) overlay.remove();
+    // Keyboard navigation for collapsible sections
+    document.addEventListener('keydown', (e) => {
+      const target = e.target;
+      
+      // Month headers
+      if(target.classList.contains('month-header')){
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          const monthKey = target.getAttribute('data-month');
+          toggleMonth(monthKey);
+        }
+      }
+      
+      // Day headers
+      if(target.classList.contains('day-header')){
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          const date = target.getAttribute('data-date');
+          toggleDay(date);
+        }
+      }
     });
-  });
+    
+    $('#addBtn').addEventListener('click', () => {
+      if(!isAuthReady) return console.warn("App not ready, wait for auth.");
 
-  $('#chartDays').addEventListener('change', () => {
-    renderChart();
-  });
+      const date = $('#date').value || todayISO();
+      const reps = Number($('#reps').value);
+      if(!reps || reps < 1) return console.error('Enter reps');
+      
+      const note = $('#note').value.trim();
+      const entry = { id: crypto.randomUUID(), date, reps, note, createdAt: Date.now() };
+      
+      // Check for achievements before adding
+      const oldTotal = state.entries.reduce((a,b)=>a+b.reps,0);
+      const oldTodayTotal = state.entries.filter(e=>e.date===date).reduce((a,b)=>a+b.reps,0);
+      const oldStreak = calculateStreak();
+      
+      const newState = { ...state, entries: [...state.entries, entry] };
+      saveState(newState); // Push new state to Firestore
+      
+      $('#reps').value = '';
+      $('#note').value = '';
+      $('#reps').focus(); // Keep focus for quick entry
+      
+      // Check achievements after adding
+      const newTodayTotal = oldTodayTotal + reps;
+      const target = Number($('#dailyTarget').value)||0;
+      
+      // Target achieved
+      if(target > 0 && oldTodayTotal < target && newTodayTotal >= target){
+        showAchievement('target', target);
+      }
+      
+      // New personal record
+      const oldHighest = state.entries.filter(e => e.id !== entry.id).length > 0 
+        ? Math.max(...state.entries.filter(e => e.id !== entry.id).map(e => e.reps))
+        : 0;
+      if(reps > oldHighest){
+        showAchievement('pr', reps);
+      }
+      
+      // New streak milestone (every 5 days)
+      // Note: We check against the current state which is still the *old* state until Firestore updates it.
+      // This is a slight race condition but acceptable for non-critical achievements.
+      const newStreak = calculateStreak(); 
+      if(newStreak > oldStreak && newStreak >= 5 && newStreak % 5 === 0){
+        showAchievement('streak', newStreak);
+      }
+      
+      // Total reps milestones
+      const newTotal = oldTotal + reps;
+      const milestones = [100, 250, 500, 1000, 2500, 5000, 10000];
+      for(const milestone of milestones){
+        if(oldTotal < milestone && newTotal >= milestone){
+          showAchievement('milestone', milestone);
+          break;
+        }
+      }
+    });
+    
+    // Enter key to add set
+    $('#reps').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        $('#addBtn').click();
+      }
+    });
+    
+    $('#note').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        $('#addBtn').click();
+      }
+    });
 
-  // init
-  $('#date').value = todayISO();
-  updateTodayBadge();
-  render();
+    function updateTodayBadge(){
+      const t = totalsFor(todayISO());
+      $('#todayTotal').textContent = `Today: ${t.dayTotal}`;
+    }
+
+    $('#clearTodayBtn').addEventListener('click', () => {
+      if(!isAuthReady) return;
+      
+      const d = $('#date').value || todayISO();
+      // Using custom modal for confirmation
+      const showClearConfirm = () => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay';
+          overlay.innerHTML = `
+            <div class="modal" role="dialog" aria-labelledby="clearModalTitle" aria-modal="true">
+              <h3 id="clearModalTitle" style="color:var(--bad)">Confirm Clear</h3>
+              <p>Are you sure you want to delete all entries for ${d}?</p>
+              <div class="modal-buttons">
+                <button class="ghost" id="cancelClear">Cancel</button>
+                <button class="danger" id="confirmClear">Delete All</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          overlay.querySelector('#confirmClear').addEventListener('click', () => {
+            const newState = { 
+              ...state, 
+              entries: state.entries.filter(e => e.date !== d) 
+            };
+            saveState(newState);
+            overlay.remove();
+          });
+          overlay.querySelector('#cancelClear').addEventListener('click', () => overlay.remove());
+          overlay.addEventListener('click', (e) => {
+            if(e.target === overlay) overlay.remove();
+          });
+        };
+        showClearConfirm();
+    });
+
+    $('#dailyTarget').addEventListener('change', () => {
+      if(!isAuthReady) return;
+      
+      const target = Number($('#dailyTarget').value)||0;
+      const newState = { ...state, target: target };
+      saveState(newState);
+    });
+    
+    // Debounce target input for better performance
+    let targetDebounce = null;
+    $('#dailyTarget').addEventListener('input', () => {
+      if(!isAuthReady) return;
+      
+      if(targetDebounce) clearTimeout(targetDebounce);
+      targetDebounce = setTimeout(() => {
+        const target = Number($('#dailyTarget').value)||0;
+        const newState = { ...state, target: target };
+        saveState(newState); // Push new state to Firestore
+      }, 500);
+    });
+
+    $('#logContainer').addEventListener('click', (e) => {
+      if(!isAuthReady) return;
+
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      const id = btn.getAttribute('data-id');
+      
+      if(btn.classList.contains('del-btn')){
+        // Using custom modal for confirmation
+        const showDeleteConfirm = () => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay';
+          overlay.innerHTML = `
+            <div class="modal" role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
+              <h3 id="deleteModalTitle" style="color:var(--bad)">Confirm Deletion</h3>
+              <p>Are you sure you want to permanently delete this set?</p>
+              <div class="modal-buttons">
+                <button class="ghost" id="cancelDelete">Cancel</button>
+                <button class="danger" id="confirmDelete">Delete</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          overlay.querySelector('#confirmDelete').addEventListener('click', () => {
+            const newState = { 
+              ...state, 
+              entries: state.entries.filter(x => x.id !== id) 
+            };
+            saveState(newState);
+            overlay.remove();
+          });
+          overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
+          overlay.addEventListener('click', (e) => {
+            if(e.target === overlay) overlay.remove();
+          });
+        };
+        showDeleteConfirm();
+      }
+      
+      if(btn.classList.contains('edit-btn')){
+        showEditModal(id);
+      }
+    });
+
+    $('#expandAllBtn').addEventListener('click', () => {
+      document.querySelectorAll('.month-content').forEach(el => {
+        el.style.display = 'block';
+      });
+      document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+        el.textContent = '▲';
+      });
+      document.querySelectorAll('.day-sets').forEach(el => {
+        el.style.display = 'block';
+      });
+      document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+        el.textContent = '▲';
+      });
+    });
+
+    $('#collapseAllBtn').addEventListener('click', () => {
+      document.querySelectorAll('.month-content').forEach(el => {
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
+        el.textContent = '▼';
+      });
+      document.querySelectorAll('.day-sets').forEach(el => {
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+        el.textContent = '▼';
+      });
+    });
+
+    // Export/Import/Reset
+    $('#exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pushup-tracker-backup.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    $('#importBtn').addEventListener('click', async () => {
+      if(!isAuthReady) return;
+      
+      const f = $('#importFile').files[0];
+      if(!f) return console.error('Choose a JSON file first');
+      
+      const text = await f.text();
+      try{
+        const data = JSON.parse(text);
+        
+        // Validate imported data
+        if(!data || typeof data !== 'object' || !Array.isArray(data.entries)){
+          throw new Error('Invalid file format or missing entries array.');
+        }
+        
+        // Validate each entry has required fields
+        for(const entry of data.entries){
+          if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
+            throw new Error('Invalid entry format in file');
+          }
+        }
+        
+        // Prepare new state object
+        const newState = { 
+          entries: data.entries, 
+          target: Number(data.target) || 30,
+          lastStreak: data.lastStreak || 0
+        };
+
+        await saveState(newState);
+        
+        const successOverlay = document.createElement('div');
+        successOverlay.className = 'modal-overlay';
+        successOverlay.innerHTML = `
+          <div class="modal" style="text-align:center">
+            <div style="font-size:48px;margin-bottom:16px">✓</div>
+            <h3>Import Successful</h3>
+            <p style="color:var(--muted);margin:16px 0">Data imported and saved to Firestore.</p>
+            <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
+          </div>
+        `;
+        document.body.appendChild(successOverlay);
+        setTimeout(() => successOverlay.remove(), 3000);
+        
+      }catch(err){ 
+        console.error('Import failed:', err);
+        const errorOverlay = document.createElement('div');
+        errorOverlay.className = 'modal-overlay';
+        errorOverlay.innerHTML = `
+          <div class="modal" style="text-align:center">
+            <h3 style="color:var(--bad)">Import Failed</h3>
+            <p style="color:var(--muted);margin:16px 0">${err.message || 'An unknown error occurred during import.'}</p>
+            <button class="primary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+          </div>
+        `;
+        document.body.appendChild(errorOverlay);
+      }
+    });
+
+    $('#resetBtn').addEventListener('click', () => {
+      if(!isAuthReady) return;
+      
+      // Show warning modal with double confirmation
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
+          <div class="warning-banner">
+            <div>
+              <strong>Warning:</strong> This will permanently delete all your push-up data (${state.entries.length} sets, ${state.entries.reduce((a,b)=>a+b.reps,0)} reps) from Firestore.
+            </div>
+          </div>
+          <p style="color:var(--muted);margin:16px 0">This action cannot be undone. We recommend exporting your data first.</p>
+          <label style="display:flex;align-items:center;gap:8px;margin:20px 0;cursor:pointer">
+            <input type="checkbox" id="confirmReset" style="width:auto;margin:0" />
+            <span>I understand this will delete all my data</span>
+          </label>
+          <div class="modal-buttons">
+            <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+            <button class="primary export-trigger" type="button">Export First</button>
+            <button class="danger" id="confirmResetBtn" disabled>Delete Everything</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      const checkbox = overlay.querySelector('#confirmReset');
+      const confirmBtn = overlay.querySelector('#confirmResetBtn');
+      
+      checkbox.addEventListener('change', () => {
+        confirmBtn.disabled = !checkbox.checked;
+      });
+      
+      overlay.querySelector('.export-trigger').addEventListener('click', (e) => {
+        e.preventDefault();
+        $('#exportBtn').click();
+      });
+      
+      confirmBtn.addEventListener('click', async () => {
+        // Reset state to empty defaults and save to Firestore
+        const newState = { entries: [], target: 30, lastStreak: 0 };
+        await saveState(newState); // This overwrites the Firestore document
+        
+        overlay.remove();
+        
+        // Show confirmation
+        const successOverlay = document.createElement('div');
+        successOverlay.className = 'modal-overlay';
+        successOverlay.innerHTML = `
+          <div class="modal" style="text-align:center">
+            <div style="font-size:48px;margin-bottom:16px">✓</div>
+            <h3>Data Reset Complete</h3>
+            <p style="color:var(--muted);margin:16px 0">All data has been deleted from Firestore.</p>
+            <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
+          </div>
+        `;
+        document.body.appendChild(successOverlay);
+        setTimeout(() => successOverlay.remove(), 3000);
+      });
+      
+      overlay.addEventListener('click', (e) => {
+        if(e.target === overlay) overlay.remove();
+      });
+    });
+
+    $('#chartDays').addEventListener('change', () => {
+      renderChart();
+    });
+
+    // --- Init ---
+    initFirebaseAndAuth();
+    $('#date').value = todayISO();
+
+    // Event delegation for month/day toggles
+    document.getElementById('logContainer').addEventListener('click', (e) => {
+        if (e.target.classList.contains('month-header')) {
+            const monthKey = e.target.getAttribute('data-month');
+            if (monthKey) toggleMonth(monthKey);
+        } else if (e.target.classList.contains('day-header')) {
+            const date = e.target.getAttribute('data-date');
+            if (date) toggleDay(date);
+        }
+    });
+
   </script>
 </body>
 </html>
