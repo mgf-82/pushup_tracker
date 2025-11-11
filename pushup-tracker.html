@@ -28,19 +28,25 @@
     @media (min-width: 1024px) {
         main {
             grid-template-columns: 350px 1fr; /* Fixed narrow left column, fluid wide right column */
+            /* UPDATED GRID AREAS: Log subsumed into Data */
             grid-template-areas: 
                 "addset chart"
-                "prs chart"
-                "summary log"
-                "data log";
+                "data chart"
+                "data prs"
+                "data summary"; 
             padding: 32px;
         }
         #addEntrySection { grid-area: addset; }
+        /* #logSection removed and its content moved into #dataSection */
+        #dataSection { grid-area: data; } /* Data now flows from end of AddSet down */
+
+        #chartSection { grid-area: chart; }
         #prSection { grid-area: prs; }
         #summarySection { grid-area: summary; }
-        #chartSection { grid-area: chart; }
-        #logSection { grid-area: log; }
-        #dataSection { grid-area: data; }
+        
+        /* Utility class to help position the PRs/Summary on the right */
+        #prSection { align-self: start; }
+        #summarySection { align-self: start; }
     }
     /* Two-column layout for tablets (768px to 1024px) */
     @media (min-width: 768px) and (max-width: 1023px) {
@@ -94,6 +100,41 @@
     .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
     details summary{cursor:pointer;color:var(--muted);user-select:none;font-size:16px}
     details summary:hover{color:var(--fg)}
+    
+    /* Custom styling for the main data management summary (subtler) */
+    #dataSection summary {
+        font-size: 18px; 
+        font-weight: 500;
+        margin: 0 0 16px;
+        color: var(--fg);
+        padding: 0;
+    }
+    
+    /* Styling for Log History Summary (inside Data Mgmt) */
+    #dataSection details details summary {
+      font-size: 18px !important; /* Smaller text size for nested summary */
+      font-weight: 600 !important; /* Bold for distinction */
+      color: var(--fg);
+      padding: 0; 
+      list-style: none; /* Hide default triangle */
+      margin: 0 0 16px;
+    }
+    #dataSection details details summary::-webkit-details-marker {
+        display: none;
+    }
+    /* Ensure old Log History header styling is removed */
+    #logSection details summary { /* This is now deprecated but kept for safety */
+      font-size: 22px; 
+      font-weight: 600; 
+      color: var(--fg);
+      padding: 0; 
+      margin: 0 0 16px;
+      list-style: none;
+    }
+    #logSection details summary::-webkit-details-marker {
+        display: none;
+    }
+
     .spacer{height:2px;background:#1b1b1e;margin:12px 0}
     .month-group{margin-bottom:20px;border:1px solid #333;border-radius:12px;overflow:hidden}
     .month-header{padding:18px 24px;background:#1f1f21;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:19px}
@@ -169,10 +210,9 @@
     </div>
     
     <!-- LEFT COLUMN SECTIONS -->
-
+    <!-- Add Set remains first on left -->
     <section class="card" aria-labelledby="addEntryH" style="display:none" data-section id="addEntrySection">
       <h2 id="addEntryH">Add Set</h2>
-      <!-- UPDATED STRUCTURE TO ENSURE FULL WIDTH -->
       <div>
         <div style="margin-bottom: 16px;">
           <label for="date">Date</label>
@@ -187,7 +227,6 @@
           <input id="note" type="text" placeholder="e.g. standard, tricep" />
         </div>
       </div>
-      <!-- END UPDATED STRUCTURE -->
       <div class="row" style="margin-top:10px">
         <button class="primary" id="addBtn">Add Set</button>
         <button id="clearTodayBtn" class="ghost">Clear Today</button>
@@ -195,6 +234,75 @@
       </div>
     </section>
     
+    <!-- LOG HISTORY REMOVED AS A SEPARATE SECTION -->
+    
+    <!-- Data Management (now including Log History) -->
+    <section class="card" aria-labelledby="dataH" style="display:none" data-section id="dataSection">
+      <details>
+        <summary id="dataH">Data Management & Backup</summary>
+        <div style="margin-top: 16px;">
+          
+          <!-- Data Management Buttons (Existing) -->
+          <h3 style="font-size:18px;margin:0 0 12px;color:var(--fg)">Backup & Import</h3>
+          <div class="row" style="margin-bottom:12px">
+            <button id="exportBtn">Export JSON</button>
+            <input type="file" id="importFile" accept="application/json" />
+            <button id="importBtn">Import</button>
+          </div>
+          <div class="row" style="margin-bottom: 24px;">
+            <button id="backupBtn" class="primary">Manual Email Backup</button>
+            <button id="resetBtn" class="danger">Reset all</button>
+          </div>
+          
+          <!-- LOG HISTORY (Nested Collapsible - Removed 'open' attribute) -->
+          <details>
+            <summary style="font-size: 18px; font-weight: 600; color: var(--fg); padding: 0; list-style: none;">Log History & Totals</summary>
+            <div style="margin-top: 16px;">
+                <div class="row" style="margin-bottom:16px">
+                    <button id="expandAllBtn" class="ghost">Expand all</button>
+                    <button id="collapseAllBtn" class="ghost">Collapse all</button>
+                </div>
+                <div id="logContainer"></div>
+                <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
+                    <strong>Total sets:</strong> <span id="totalSets">0</span> | 
+                    <strong>Total reps:</strong> <span id="totalReps">0</span>
+                </div>
+            </div>
+          </details>
+          
+          <!-- Raw JSON (Existing) -->
+          <details style="margin-top:24px">
+            <summary>See raw JSON</summary>
+            <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
+          </details>
+
+          <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your data is stored locally in your browser and is not synced. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- RIGHT COLUMN SECTIONS -->
+
+    <!-- Chart remains first on right -->
+    <section class="card" aria-labelledby="chartH" style="display:none" data-section id="chartSection">
+      <h2 id="chartH">Progress Chart</h2>
+      <div style="position:relative;height:400px">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label for="chartDays">Show last</label>
+          <select id="chartDays">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRs MOVED TO RIGHT COLUMN (under chart) -->
     <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
         <h2 id="prH">Personal Records (PRs)</h2>
         <div class="pr-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
@@ -213,6 +321,7 @@
         </div>
     </section>
 
+    <!-- Summary & Goals MOVED TO RIGHT COLUMN (under PRs) -->
     <section class="card" aria-labelledby="summaryH" style="display:none" data-section id="summarySection">
       <h2 id="summaryH">Summary & Goals</h2>
       <div class="key-stats-grid">
@@ -266,59 +375,6 @@
         </div>
       </div>
       <div id="weeklyComparison" style="text-align:center;font-size:16px;color:var(--muted)"></div>
-    </section>
-
-    <!-- RIGHT COLUMN SECTIONS -->
-
-    <section class="card" aria-labelledby="chartH" style="display:none" data-section id="chartSection">
-      <h2 id="chartH">Progress Chart</h2>
-      <div style="position:relative;height:400px">
-        <canvas id="chart"></canvas>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <div>
-          <label for="chartDays">Show last</label>
-          <select id="chartDays">
-            <option value="7">7 days</option>
-            <option value="14">14 days</option>
-            <option value="30" selected>30 days</option>
-            <option value="90">90 days</option>
-          </select>
-        </div>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="logH" style="display:none" data-section id="logSection">
-      <h2 id="logH">Log History</h2>
-      <div class="row" style="margin-bottom:16px">
-        <button id="expandAllBtn" class="ghost">Expand all</button>
-        <button id="collapseAllBtn" class="ghost">Collapse all</button>
-      </div>
-      <div id="logContainer"></div>
-      <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
-        <strong>Total sets:</strong> <span id="totalSets">0</span> | 
-        <strong>Total reps:</strong> <span id="totalReps">0</span>
-      </div>
-      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored in local storage, only available on this device. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
-    </section>
-
-    <section class="card" aria-labelledby="dataH" style="display:none" data-section id="dataSection">
-      <h2 id="dataH">Data Management & Backup</h2>
-      <div class="row" style="margin-bottom:12px">
-        <button id="exportBtn">Export JSON</button>
-        <input type="file" id="importFile" accept="application/json" />
-        <button id="importBtn">Import</button>
-      </div>
-      <div class="row">
-        <button id="backupBtn" class="primary">Manual Email Backup</button>
-        <button id="resetBtn" class="danger">Reset all</button>
-      </div>
-      
-      <details style="margin-top:16px">
-        <summary>See raw JSON</summary>
-        <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
-      </details>
-      <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your data is stored locally in your browser and is not synced. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
     </section>
   </main>
 
@@ -1290,7 +1346,8 @@
       }, CONSTANTS.TARGET_DEBOUNCE_MS);
     });
 
-    $('#logContainer').addEventListener('click', (e) => {
+    // Event delegation is still active on logContainer, which is now inside #dataSection
+    document.getElementById('logContainer').addEventListener('click', (e) => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
 
       const btn = e.target.closest('button');
@@ -1342,7 +1399,8 @@
         showEditModal(id);
       }
     });
-
+    
+    // Log history toggle buttons still need to function
     $('#expandAllBtn').addEventListener('click', () => {
       document.querySelectorAll('.month-content, .day-sets').forEach(el => {
         el.style.display = 'block';
@@ -1361,6 +1419,20 @@
       });
     });
 
+    // Event delegation for month/day toggles (kept, as it targets elements within logContainer)
+    document.getElementById('logContainer').addEventListener('click', (e) => {
+        const header = e.target.closest('.month-header, .day-header');
+        if (!header) return;
+
+        if (header.classList.contains('month-header')) {
+            const monthKey = header.getAttribute('data-month');
+            if (monthKey) toggleMonth(monthKey);
+        } else if (header.classList.contains('day-header')) {
+            const date = header.getAttribute('data-date');
+            if (date) toggleDay(date);
+        }
+    });
+    
     // Export/Import/Reset
     $('#exportBtn').addEventListener('click', () => {
       try {
@@ -1514,20 +1586,6 @@
     // --- Init ---
     initApp();
     $('#date').value = todayISO();
-
-    // Event delegation for month/day toggles
-    document.getElementById('logContainer').addEventListener('click', (e) => {
-        const header = e.target.closest('.month-header, .day-header');
-        if (!header) return;
-
-        if (header.classList.contains('month-header')) {
-            const monthKey = header.getAttribute('data-month');
-            if (monthKey) toggleMonth(monthKey);
-        } else if (header.classList.contains('day-header')) {
-            const date = header.getAttribute('data-date');
-            if (date) toggleDay(date);
-        }
-    });
 
   </script>
 </body>
