@@ -14,7 +14,7 @@
     /* NEW LAYOUT STYLES */
     main{
       width: 100%;
-      max-width: 1600px; /* Increased max width for dashboard look */
+      max-width: 1600px;
       margin: 0 auto;
       padding: 32px;
       display: grid;
@@ -35,7 +35,7 @@
             padding: 32px;
         }
         #addEntrySection { grid-area: addset; }
-        #prSection { grid-area: prs; } /* New PR section */
+        #prSection { grid-area: prs; }
         #summarySection { grid-area: summary; }
         #chartSection { grid-area: chart; }
         #logSection { grid-area: log; }
@@ -55,18 +55,19 @@
     /* ADJUSTED FONT SIZE FOR METRIC LABELS */
     label{
       display:block;
-      font-size:14px; /* Reduced from 15px */
+      font-size:14px;
       color:var(--muted);
       margin-bottom:8px;
       font-weight:500;
-      white-space: nowrap; /* Prevent wrapping if possible, though reducing size is primary fix */
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     
     input,select,button,textarea{background:#0f1012;color:var(--fg);border:1px solid #2a2b2f;border-radius:12px;padding:14px 16px;font:inherit;font-size:16px}
     input[type=date]{padding:.7rem}
-    button{cursor:pointer;font-weight:500}
+    button{cursor:pointer;font-weight:500;transition: opacity 0.2s}
+    button:disabled{opacity: 0.5; cursor: not-allowed;}
     button.primary{background:var(--accent);border-color:var(--accent);color:white}
     button.ghost{background:transparent}
     button.danger{background:var(--bad);border-color:var(--bad);color:white}
@@ -154,7 +155,6 @@
 <body>
   <header>
     <h1>Push-up Tracker</h1>
-    <!-- Updated to Local Storage -->
     <span class="pill" id="storageInfo">Local Storage</span>
     <div class="pill" id="weekInfo">Week: —</div>
     <div id="streakBadge"></div>
@@ -189,16 +189,13 @@
       </div>
     </section>
     
-    <!-- NEW SECTION: PERSONAL RECORDS (PRs) -->
     <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
         <h2 id="prH">Personal Records (PRs)</h2>
-        <!-- UPDATED: Changed to a 3-column grid -->
         <div class="pr-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
             <div>
               <label>Highest Single Set 💪</label>
               <div class="status ok" id="highestSet">0</div>
             </div>
-            <!-- NEW: Highest Daily Total -->
             <div>
               <label>Highest Daily Total 🚀</label>
               <div class="status ok" id="highestDailyTotal">0</div>
@@ -228,7 +225,6 @@
       </div>
       <div class="spacer"></div>
       <div class="key-stats-grid">
-        <!-- Metrics with slightly smaller status text to reduce wrapping -->
         <div>
           <label>Average Per Set</label>
           <div class="status" id="avgSet" style="font-size:28px">0</div>
@@ -237,7 +233,6 @@
           <label>Sets Today</label>
           <div class="status" id="setsToday" style="font-size:28px">0</div>
         </div>
-        <!-- Added empty filler for better layout on smaller screens if necessary -->
         <div class="hidden lg:block"></div> 
       </div>
       <div class="spacer"></div>
@@ -298,13 +293,11 @@
         <strong>Total sets:</strong> <span id="totalSets">0</span> | 
         <strong>Total reps:</strong> <span id="totalReps">0</span>
       </div>
-      <!-- Updated storage description -->
       <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Data is stored in local storage, only available on this device.</p>
     </section>
 
     <section class="card" aria-labelledby="dataH" style="display:none" data-section id="dataSection">
       <h2 id="dataH">Data Management & Backup</h2>
-      <!-- UPDATED: Added Manual Email Backup button -->
       <div class="row" style="margin-bottom:12px">
         <button id="exportBtn">Export JSON</button>
         <input type="file" id="importFile" accept="application/json" />
@@ -319,49 +312,88 @@
         <summary>See raw JSON</summary>
         <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
       </details>
-      <!-- Updated storage description -->
       <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your data is stored locally in your browser and is not synced. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
     </section>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-  <!-- ADDED: EmailJS SDK for email backups -->
-  <script src="https://cdn.emailjs.com/sdk/v3/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script type="module">
-    // --- Storage Setup using Local Storage Only ---
-    const STORAGE_KEY = 'pushup_tracker_data';
     
-    // --- EMAILJS CONFIGURATION (REPLACED WITH USER'S CREDENTIALS) ---
-    // Template: template_p5mez4i
-    // Service: service_uytnfr4
-    // Public Key: 55PGXk4S6xIqSJ2Lq
-    const EMAILJS_SERVICE_ID = 'service_uytnfr4'; 
-    const EMAILJS_TEMPLATE_ID = 'template_p5mez4i'; 
-    const EMAILJS_PUBLIC_KEY = '55PGXk4S6xIqSJ2Lq'; 
-    const LAST_BACKUP_KEY = 'pushup_tracker_last_backup_date';
+    // --- CONSTANTS AND CONFIGURATION (Magic Numbers fix) ---
+    const CONSTANTS = {
+        STORAGE_KEY: 'pushup_tracker_data',
+        LAST_BACKUP_KEY: 'pushup_tracker_last_backup_date',
+        // EmailJS Config (USER'S CREDENTIALS)
+        // NOTE: Please ensure these keys are correct for your EmailJS account.
+        EMAILJS_SERVICE_ID: 'service_uytnfr4', 
+        EMAILJS_TEMPLATE_ID: 'template_p5mez4i', 
+        EMAILJS_PUBLIC_KEY: '55PGXk4S6xIqSJ2Lq',
+        // Timing
+        BACKUP_TARGET_HOUR: 0, 
+        BACKUP_TARGET_MINUTE: 15, 
+        DAILY_CHECK_INTERVAL_MS: 3600000, 
+        RENDER_DEBOUNCE_MS: 50,
+        TARGET_DEBOUNCE_MS: 500,
+        // UI
+        TOAST_AUTO_CLOSE_MS: 3000,
+        CELEBRATION_AUTO_CLOSE_MS: 5000,
+        // Milestones
+        MILESTONES: [100, 250, 500, 1000, 2500, 5000, 10000],
+        STREAK_ACHIEVEMENT_STEP: 5,
+        // UI Text
+        LOADING_TEXT: 'Loading...',
+        ERROR_TEXT: 'Error',
+        SUCCESS_TEXT: 'Success',
+        WARNING_TEXT: 'Warning'
+    };
     
     // Initialize EmailJS
-    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY.startsWith('55PGXk4S6xIqSJ2Lq') === true) {
-        emailjs.init(EMAILJS_PUBLIC_KEY);
+    // The previous restrictive check on the key starting with a specific string was removed here.
+    if (typeof emailjs !== 'undefined' && CONSTANTS.EMAILJS_PUBLIC_KEY) {
+        emailjs.init({ publicKey: CONSTANTS.EMAILJS_PUBLIC_KEY });
     }
 
-    // UPDATED STATE: Added highestDailyTotal alongside highestWeeklyTotal
-    let state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
+    // UPDATED STATE STRUCTURE
+    let state = { entries: [], target: 30, lastStreak: 0 };
     let isStorageReady = false; 
     let chartInstance = null;
     let renderDebounceTimer = null;
     let lastRenderedState = null;
     
     const $ = sel => document.querySelector(sel);
-    const todayISO = () => {
+    
+    // --- UTILITIES ---
+
+    function todayISO() {
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
-    };
+    }
+
+    function wkRange(d){
+      const dt = new Date(d);
+      const day = (dt.getDay()+6)%7; // Monday = 0
+      const mon = new Date(dt); mon.setDate(dt.getDate()-day);
+      const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+      return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+    }
     
-    // ADDED: Simple custom alert replacement for feedback
+    // Security: XSS Prevention (Additional Improvements fix)
+    function escapeHtml(text) {
+        if (typeof text !== 'string') return text;
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // --- FEEDBACK/ALERT HELPERS (Inconsistent Error Handling fix) ---
+    
     function alertMessage(title, message, type) {
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
@@ -373,14 +405,31 @@
           </div>
         `;
         document.body.appendChild(overlay);
-        // Remove on click outside or after 4s
-        setTimeout(() => overlay.remove(), 4000);
+        // Auto-close after 3 seconds
+        setTimeout(() => overlay.remove(), CONSTANTS.TOAST_AUTO_CLOSE_MS);
         overlay.addEventListener('click', (e) => {
             if(e.target === overlay) overlay.remove();
         });
     }
 
-    // Helper to show/hide the main content after loading
+    const showSuccess = (message) => alertMessage(CONSTANTS.SUCCESS_TEXT, message, 'ok');
+    const showWarning = (message) => alertMessage(CONSTANTS.WARNING_TEXT, message, 'warn');
+    const showError = (message) => alertMessage(CONSTANTS.ERROR_TEXT, message, 'bad');
+    
+    // Loading States fix
+    function setLoading(buttonId, isLoading, originalText = null) {
+        const btn = $(`#${buttonId}`);
+        if (btn) {
+            btn.textContent = isLoading ? CONSTANTS.LOADING_TEXT : (originalText || btn.dataset.originalText || btn.textContent);
+            btn.disabled = isLoading;
+            if (!isLoading) {
+                delete btn.dataset.originalText;
+            } else if (!btn.dataset.originalText) {
+                btn.dataset.originalText = originalText || btn.textContent;
+            }
+        }
+    }
+    
     function toggleContent(show) {
         const appContent = $('#appContent');
         const loadingIndicator = $('#loadingIndicator');
@@ -391,266 +440,49 @@
             el.style.display = show ? 'grid' : 'none';
         });
         
-        // Update storage info pill to reflect local storage
-        $('#storageInfo').textContent = 'Local Storage';
+        $('#storageInfo').textContent = 'Local Storage (This Device)';
     }
 
-    // --- Storage Functions using Local Storage ---
+    // --- STORAGE FUNCTIONS ---
 
-    /**
-     * Loads state from localStorage.
-     * Synchronous implementation.
-     */
     function loadState() {
       try {
-        const localData = localStorage.getItem(STORAGE_KEY);
+        const localData = localStorage.getItem(CONSTANTS.STORAGE_KEY);
         if (localData) {
           const loadedState = JSON.parse(localData);
-          // Ensure new fields exist on old state objects
           state = {
             entries: loadedState.entries || [],
             target: loadedState.target || 30,
             lastStreak: loadedState.lastStreak || 0,
-            highestWeeklyTotal: loadedState.highestWeeklyTotal || 0,
-            highestDailyTotal: loadedState.highestDailyTotal || 0, // Initialize new field
           };
-          console.log('Loaded state from localStorage.');
         } else {
-          // No data found, use defaults
-          state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
-          console.log('Using default state.');
+          state = { entries: [], target: 30, lastStreak: 0 };
         }
       } catch (error) {
         console.error('Error loading state from localStorage:', error);
-        state = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
+        state = { entries: [], target: 30, lastStreak: 0 };
+        showError('Could not load data from local storage. Your data may be corrupted.');
       }
     }
 
-    /**
-     * Saves state to localStorage.
-     * Synchronous implementation.
-     */
     function saveState(newState) {
       state = newState;
-      
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-        console.log('State saved to localStorage.');
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(newState));
+        scheduleRender();
       } catch (error) {
         console.error('Error saving to localStorage:', error);
-      }
-      
-      render();
-    }
-    
-    // --- EMAILJS BACKUP LOGIC ---
-
-    /**
-     * Sends the current state as a backup email via EmailJS.
-     * Updates LAST_BACKUP_KEY in localStorage upon success.
-     */
-    function sendBackupEmail() {
-      if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY.startsWith('55PGXk4S6xIqSJ2Lq') === false || typeof emailjs === 'undefined' || !emailjs.init) {
-          console.warn("EmailJS is not fully configured or SDK not loaded. Backup skipped.");
-          return Promise.resolve({ status: 400, text: 'Skipped - Not Configured' });
-      }
-      
-      // Calculate stats needed for the email body
-      const totalReps = state.entries.reduce((a,b)=>a+b.reps,0);
-      const totalSets = state.entries.length;
-      const exportDate = new Date().toLocaleString();
-      
-      const fullStateForBackup = { 
-        ...state, 
-        totalSets, 
-        totalReps, 
-        exportDate: new Date().toISOString() 
-      };
-
-      const templateParams = {
-          subject: `Push-up Tracker Backup - ${new Date().toLocaleDateString()}`,
-          totalReps: totalReps,
-          totalSets: totalSets,
-          backupTime: exportDate,
-          // Stringify the current state to send as the full data object
-          backupData: JSON.stringify(fullStateForBackup, null, 2),
-      };
-
-      console.log("Attempting to send backup email...");
-
-      return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-          .then((response) => {
-              console.log('Email successfully sent!', response.status, response.text);
-              localStorage.setItem(LAST_BACKUP_KEY, todayISO()); // Record successful backup
-              return response;
-          })
-          .catch((error) => {
-              console.error('Email sending failed:', error);
-              return error;
-          });
-    }
-
-    /**
-     * Schedules a check to run daily at 12:15 AM (00:15).
-     * Only attempts to send if a backup hasn't been sent for today.
-     */
-    function scheduleDailyBackupCheck() {
-        // Target backup time: 12:15 AM
-        const targetHour = 0;
-        const targetMinute = 15;
-        
-        const now = new Date();
-        const today = todayISO();
-        const lastBackupDate = localStorage.getItem(LAST_BACKUP_KEY);
-        
-        const isPastTargetTime = (now.getHours() > targetHour || (now.getHours() === targetHour && now.getMinutes() >= targetMinute));
-        
-        if (lastBackupDate !== today && isPastTargetTime) {
-            console.log("Midnight backup window hit. Sending backup...");
-            // Non-blocking call to send the email
-            sendBackupEmail();
-            // Schedule the next check in 60 minutes to ensure coverage if the first attempt fails
-            setTimeout(scheduleDailyBackupCheck, 3600000); 
-            return;
-        }
-
-        // Calculate delay until the next day's check window starts (00:15)
-        let nextCheck = new Date(now);
-        
-        if (isPastTargetTime) {
-            // If past the target time (e.g., it's 3 AM), schedule for 00:15 tomorrow
-            nextCheck.setDate(nextCheck.getDate() + 1);
-        }
-        // Set time to target hour and minute
-        nextCheck.setHours(targetHour, targetMinute, 0, 0);
-
-        const delayMs = nextCheck.getTime() - now.getTime();
-        
-        console.log(`Scheduling next daily backup check in ${Math.round(delayMs / 3600000)} hours.`);
-        setTimeout(scheduleDailyBackupCheck, delayMs);
-    }
-    
-    // --- Init & Setup ---
-
-    function initApp() {
-      try {
-        loadState();
-        
-        // FIXES: Calculate highest PRs based on all historical data right after loading
-        calculateHighestWeeklyTotal(state.entries); 
-        calculateHighestDailyTotal(state.entries);
-
-        isStorageReady = true;
-        $('#storageInfo').textContent = 'Local Storage (This Device)';
-        render();
-        toggleContent(true);
-        
-        // ADDED: Start the daily backup scheduler
-        scheduleDailyBackupCheck();
-        
-      } catch (error) {
-        console.error('App initialization failed (Local Storage):', error);
-        // Still display content even if initial load fails
-        isStorageReady = true; 
-        $('#storageInfo').textContent = 'Local Storage Error';
-        render();
-        toggleContent(true);
+        showError('Could not save data to local storage. Your changes may not be saved.');
       }
     }
     
-    // Debounced render for performance
-    function scheduleRender(){
-      if(renderDebounceTimer){
-        clearTimeout(renderDebounceTimer);
-      }
-      renderDebounceTimer = setTimeout(() => {
-        render();
-        renderDebounceTimer = null;
-      }, 50);
-    }
+    // --- CALCULATION LOGIC (State Mutation and Redundant Recalculations fix) ---
 
-    // --- Core Application Logic ---
-
-    function wkRange(d){
-      const dt = new Date(d);
-      const day = (dt.getDay()+6)%7;
-      const mon = new Date(dt); mon.setDate(dt.getDate()-day);
-      const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-      return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
-    }
-
-    function totalsFor(dateStr){
-      const dayTotal = state.entries.filter(e=>e.date===dateStr).reduce((a,b)=>a+b.reps,0);
-      const [ws,we] = wkRange(dateStr);
-      const weekTotal = state.entries.filter(e=>e.date>=ws && e.date<=we).reduce((a,b)=>a+b.reps,0);
-      const all = state.entries.reduce((a,b)=>a+b.reps,0);
-      return { dayTotal, weekTotal, all };
-    }
-    
-    // NEW FUNCTION: Calculates the all-time highest daily total from scratch
-    function calculateHighestDailyTotal(entries) {
-        if (entries.length === 0) {
-            state.highestDailyTotal = 0;
-            return;
-        }
-
-        // 1. Group entries by date
-        const dailyTotals = {};
-        for (const entry of entries) {
-            dailyTotals[entry.date] = (dailyTotals[entry.date] || 0) + entry.reps;
-        }
-
-        // 2. Find the maximum total across all recorded days
-        const maxDailyTotal = Math.max(...Object.values(dailyTotals));
-        
-        // 3. Update the state if a new all-time high is found
-        if (maxDailyTotal > state.highestDailyTotal) {
-             state.highestDailyTotal = maxDailyTotal;
-        }
-        
-        // Edge case: If current highest is 0 and we have data, use the max.
-        if (state.highestDailyTotal === 0 && maxDailyTotal > 0) {
-            state.highestDailyTotal = maxDailyTotal;
-        }
-        
-        console.log('Recalculated highest daily total:', state.highestDailyTotal);
-    }
-    
-    // NEW FUNCTION: Calculates the all-time highest weekly total from scratch
-    function calculateHighestWeeklyTotal(entries) {
-        if (entries.length === 0) {
-            state.highestWeeklyTotal = 0;
-            return;
-        }
-
-        // 1. Group entries by week start date (ISO string)
-        const weeklyTotals = {};
-        for (const entry of entries) {
-            const [weekStart] = wkRange(entry.date);
-            weeklyTotals[weekStart] = (weeklyTotals[weekStart] || 0) + entry.reps;
-        }
-
-        // 2. Find the maximum total across all recorded weeks
-        const maxWeeklyTotal = Math.max(...Object.values(weeklyTotals));
-        
-        // 3. Update the state if a new all-time high is found
-        if (maxWeeklyTotal > state.highestWeeklyTotal) {
-             state.highestWeeklyTotal = maxWeeklyTotal;
-        }
-        
-        // Edge case: If current highest is 0 and we have data, use the max.
-        if (state.highestWeeklyTotal === 0 && maxWeeklyTotal > 0) {
-            state.highestWeeklyTotal = maxWeeklyTotal;
-        }
-        
-        console.log('Recalculated highest weekly total:', state.highestWeeklyTotal);
-    }
-
-    // Calculate current streak
-    function calculateStreak(){
-      if(state.entries.length === 0) return 0;
+    // Calculate streak (accepts entries as parameter)
+    function calculateStreak(entries) {
+      if(entries.length === 0) return 0;
       
-      const uniqueDates = [...new Set(state.entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
+      const uniqueDates = [...new Set(entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
       const today = todayISO();
       
       let streak = 0;
@@ -659,12 +491,10 @@
       for(let i = 0; i < uniqueDates.length; i++){
         if(uniqueDates[i] === checkDate){
           streak++;
-          // Move to previous day
           const d = new Date(checkDate);
           d.setDate(d.getDate() - 1);
           checkDate = d.toISOString().slice(0,10);
         } else {
-          // Check if we should include yesterday for today's streak
           const yesterday = new Date(today);
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayISO = yesterday.toISOString().slice(0,10);
@@ -679,11 +509,171 @@
           }
         }
       }
-      
       return streak;
     }
+
+    // Combined stats calculation (calculateAllStats function)
+    function calculateAllStats(entries, currentTargetDate = todayISO()) {
+        const stats = {
+            totalReps: 0,
+            totalSets: entries.length,
+            highestSet: 0,
+            highestDailyTotal: 0,
+            highestWeeklyTotal: 0,
+            dailyTotals: {},
+            weeklyTotals: {},
+            currentDayTotal: 0,
+            currentWeekTotal: 0,
+            lastWeekTotal: 0,
+            avgSet: 0,
+            currentSetsToday: 0
+        };
+
+        const todayStr = todayISO(); // String representation of today
+        const todayDate = new Date(todayStr); // Date object for calculations
+        const [currentWeekStart, currentWeekEnd] = wkRange(todayStr);
+
+        // Single pass through all entries
+        for (const entry of entries) {
+            stats.totalReps += entry.reps;
+            
+            // Highest Set PR
+            stats.highestSet = Math.max(stats.highestSet, entry.reps);
+
+            // Daily Totals 
+            stats.dailyTotals[entry.date] = (stats.dailyTotals[entry.date] || 0) + entry.reps;
+            
+            // Weekly Totals 
+            const [weekStart] = wkRange(entry.date);
+            stats.weeklyTotals[weekStart] = (stats.weeklyTotals[weekStart] || 0) + entry.reps;
+        }
+
+        // Calculate PRs from totals
+        if (stats.totalSets > 0) {
+            stats.highestDailyTotal = Math.max(...Object.values(stats.dailyTotals));
+            stats.highestWeeklyTotal = Math.max(...Object.values(stats.weeklyTotals));
+            stats.avgSet = Math.round(stats.totalReps / stats.totalSets);
+        }
+        
+        // Calculate current day/week totals
+        stats.currentDayTotal = stats.dailyTotals[currentTargetDate] || 0;
+        stats.currentWeekTotal = stats.weeklyTotals[currentWeekStart] || 0;
+        stats.currentSetsToday = entries.filter(e => e.date === todayStr).length;
+
+        // Calculate last week's total (Fixes the TypeError)
+        const lastWeekDate = new Date(todayDate); // Use the Date object
+        lastWeekDate.setDate(todayDate.getDate() - 7); // Use getDate() on the Date object
+        const [lastWeekStart] = wkRange(lastWeekDate.toISOString().slice(0,10));
+        stats.lastWeekTotal = stats.weeklyTotals[lastWeekStart] || 0;
+
+        return stats;
+    }
+
+    // --- EMAILJS BACKUP LOGIC ---
+
+    async function sendBackupEmail() {
+      // FIX: The following conditional was badly malformed. It is corrected to cleanly check for EmailJS readiness.
+      if (!CONSTANTS.EMAILJS_PUBLIC_KEY || typeof emailjs === 'undefined' || typeof emailjs.send !== 'function') {
+          showWarning("Email backup is not configured. Please ensure your EmailJS keys are correct and the library has initialized.");
+          return { status: 400, text: 'Skipped - Not Configured' };
+      }
+      
+      const stats = calculateAllStats(state.entries);
+      const exportDate = new Date().toLocaleString();
+      
+      const fullStateForBackup = { 
+        ...state, 
+        totalSets: stats.totalSets, 
+        totalReps: stats.totalReps, 
+        exportDate: new Date().toISOString() 
+      };
+
+      const templateParams = {
+          subject: `Push-up Tracker Backup - ${new Date().toLocaleDateString()}`,
+          totalReps: stats.totalReps,
+          totalSets: stats.totalSets,
+          backupTime: exportDate,
+          backupData: JSON.stringify(fullStateForBackup, null, 2),
+      };
+
+      try {
+        const response = await emailjs.send(CONSTANTS.EMAILJS_SERVICE_ID, CONSTANTS.EMAILJS_TEMPLATE_ID, templateParams);
+        localStorage.setItem(CONSTANTS.LAST_BACKUP_KEY, todayISO());
+        return response;
+      } catch (error) {
+        console.error('Email sending failed:', error);
+        throw new Error('Email sending failed. See console for details.');
+      }
+    }
+
+    function scheduleDailyBackupCheck() {
+        const { BACKUP_TARGET_HOUR, BACKUP_TARGET_MINUTE, LAST_BACKUP_KEY, DAILY_CHECK_INTERVAL_MS } = CONSTANTS;
+        
+        const now = new Date();
+        const today = todayISO();
+        const lastBackupDate = localStorage.getItem(LAST_BACKUP_KEY);
+        
+        const isPastTargetTime = (now.getHours() > BACKUP_TARGET_HOUR || (now.getHours() === BACKUP_TARGET_HOUR && now.getMinutes() >= BACKUP_TARGET_MINUTE));
+        
+        if (lastBackupDate !== today && isPastTargetTime) {
+            console.log("Midnight backup window hit. Sending backup...");
+            sendBackupEmail()
+              .then(res => {
+                  if (res.status === 200) { console.log('Auto-backup success.'); }
+                  else { console.warn('Auto-backup failed/skipped.', res.text); }
+              })
+              .catch(e => console.error('Auto-backup failed:', e));
+            
+            setTimeout(scheduleDailyBackupCheck, DAILY_CHECK_INTERVAL_MS); 
+            return;
+        }
+
+        let nextCheck = new Date(now);
+        
+        if (isPastTargetTime) {
+            nextCheck.setDate(nextCheck.getDate() + 1);
+        }
+        nextCheck.setHours(BACKUP_TARGET_HOUR, BACKUP_TARGET_MINUTE, 0, 0);
+
+        const delayMs = nextCheck.getTime() - now.getTime();
+        
+        setTimeout(scheduleDailyBackupCheck, delayMs);
+    }
     
-    // Show achievement celebration
+    // --- Init & Setup ---
+
+    function initApp() {
+      try {
+        loadState();
+        isStorageReady = true;
+        
+        scheduleRender();
+        toggleContent(true);
+        
+        scheduleDailyBackupCheck();
+        
+      } catch (error) {
+        console.error('App initialization failed:', error);
+        isStorageReady = true; 
+        $('#storageInfo').textContent = 'Local Storage Error';
+        scheduleRender();
+        toggleContent(true);
+      }
+    }
+    
+    // Debounced render for performance
+    function scheduleRender(){
+      if(renderDebounceTimer){
+        clearTimeout(renderDebounceTimer);
+      }
+      renderDebounceTimer = setTimeout(() => {
+        render();
+        renderDebounceTimer = null;
+      }, CONSTANTS.RENDER_DEBOUNCE_MS);
+    }
+
+    // --- RENDER & STATS UPDATE ---
+    
     function showAchievement(type, value){
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -731,66 +721,46 @@
         if(e.target === overlay) overlay.remove();
       });
       
-      // Auto-remove after 5 seconds
-      setTimeout(() => overlay.remove(), 5000);
+      // Auto-close after 5 seconds
+      setTimeout(() => overlay.remove(), CONSTANTS.CELEBRATION_AUTO_CLOSE_MS);
     }
     
-    function updateStats(){
-      const t = totalsFor($('#date').value || todayISO());
-      $('#dailyTotal').textContent = t.dayTotal;
-      $('#weeklyTotal').textContent = t.weekTotal;
-      $('#allTimeTotal').textContent = t.all;
+    function updateStats(stats){
+      const targetDate = $('#date').value || todayISO();
       
-      // Calculate highest set
-      const highestSet = state.entries.length > 0 ? Math.max(...state.entries.map(e => e.reps)) : 0;
-      $('#highestSet').textContent = highestSet;
+      // Summary & Totals
+      $('#dailyTotal').textContent = stats.dailyTotals[targetDate] || 0;
+      $('#weeklyTotal').textContent = stats.currentWeekTotal;
+      $('#allTimeTotal').textContent = stats.totalReps;
       
-      // Calculate average per set
-      const avgSet = state.entries.length > 0 ? Math.round(state.entries.reduce((a,b)=>a+b.reps,0) / state.entries.length) : 0;
-      $('#avgSet').textContent = avgSet;
+      // Personal Records
+      $('#highestSet').textContent = stats.highestSet;
+      $('#highestDailyTotal').textContent = stats.highestDailyTotal;
+      $('#highestWeeklyTotal').textContent = stats.highestWeeklyTotal;
       
-      // Sets today
-      const todayDate = todayISO();
-      const setsToday = state.entries.filter(e => e.date === todayDate).length;
-      $('#setsToday').textContent = setsToday;
+      // Other Metrics
+      $('#avgSet').textContent = stats.avgSet;
+      $('#setsToday').textContent = stats.currentSetsToday;
       
       // Target status
       const target = Number($('#dailyTarget').value)||0;
-      const pct = target ? Math.round((t.dayTotal/target)*100) : 0;
+      const dayTotal = stats.dailyTotals[todayISO()] || 0;
+      const pct = target ? Math.round((dayTotal/target)*100) : 0;
       const el = $('#targetStatus');
       el.textContent = `${pct}% of target`;
       el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
       
-      // Update totals
-      $('#totalSets').textContent = state.entries.length;
-      $('#totalReps').textContent = state.entries.reduce((a,b)=>a+b.reps,0);
-      
-      // Update new highest daily/weekly total displays
-      $('#highestDailyTotal').textContent = state.highestDailyTotal;
-      $('#highestWeeklyTotal').textContent = state.highestWeeklyTotal;
+      // Log totals
+      $('#totalSets').textContent = stats.totalSets;
+      $('#totalReps').textContent = stats.totalReps;
 
       // Weekly comparison
-      updateWeeklyComparison();
+      updateWeeklyComparison(stats);
     }
     
-    // Calculate weekly comparison and update highestWeeklyTotal
-    function updateWeeklyComparison(){
-      const today = new Date();
-      const [thisWeekStart, thisWeekEnd] = wkRange(today.toISOString().slice(0,10));
-      
-      // Calculate last week range
-      const lastWeekDate = new Date(today);
-      lastWeekDate.setDate(today.getDate() - 7);
-      const [lastWeekStart, lastWeekEnd] = wkRange(lastWeekDate.toISOString().slice(0,10));
-      
-      // Calculate totals
-      const thisWeekTotal = state.entries
-        .filter(e => e.date >= thisWeekStart && e.date <= thisWeekEnd)
-        .reduce((sum, e) => sum + e.reps, 0);
-        
-      const lastWeekTotal = state.entries
-        .filter(e => e.date >= lastWeekStart && e.date <= lastWeekEnd)
-        .reduce((sum, e) => sum + e.reps, 0);
+    function updateWeeklyComparison(stats){
+      const thisWeekTotal = stats.currentWeekTotal;
+      const lastWeekTotal = stats.lastWeekTotal;
       
       $('#thisWeekTotal').textContent = thisWeekTotal;
       $('#lastWeekTotal').textContent = lastWeekTotal;
@@ -814,25 +784,16 @@
         arrow.style.color = 'var(--muted)';
         comparison.innerHTML = `<span class="trend stable">Same as last week</span> <span style="color:var(--muted);margin-left:8px">Stay consistent!</span>`;
       }
-      
-      // Check for new highest weekly total *after* updating the current week's total
-      if (thisWeekTotal > state.highestWeeklyTotal) {
-          const oldHighest = state.highestWeeklyTotal;
-          state.highestWeeklyTotal = thisWeekTotal;
-          if (oldHighest > 0) { // Only celebrate if it's an actual improvement over a previous record
-            showAchievement('weekly_pr', thisWeekTotal);
-          }
-      }
     }
 
     function render(){
-      // inputs
       $('#date').value ||= todayISO();
       $('#dailyTarget').value = state.target;
 
-      // Check if we need full re-render or just stats update
-      // Include new state variables in string check
-      const stateStr = JSON.stringify(state.entries) + state.highestWeeklyTotal + state.highestDailyTotal; 
+      const currentTargetDate = $('#date').value || todayISO();
+      const stats = calculateAllStats(state.entries, currentTargetDate);
+
+      const stateStr = JSON.stringify(state.entries); 
       const needsFullRender = stateStr !== lastRenderedState;
       
       if(needsFullRender){
@@ -840,14 +801,12 @@
         lastRenderedState = stateStr;
       }
       
-      // Always update stats (fast)
-      updateStats();
+      updateStats(stats);
 
-      const [ws,we] = wkRange($('#date').value || todayISO());
+      const [ws,we] = wkRange(currentTargetDate);
       $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
       
-      // Update streak badge
-      const currentStreak = calculateStreak();
+      const currentStreak = calculateStreak(state.entries);
       const streakEl = $('#streakBadge');
       if(currentStreak >= 2){
         streakEl.innerHTML = `<div class="streak-badge"><span class="streak-emoji">🔥</span>${currentStreak} day streak</div>`;
@@ -857,14 +816,12 @@
 
       $('#raw').textContent = JSON.stringify(state,null,2);
       
-      // Only re-render chart if needed
       if(needsFullRender || !chartInstance){
         renderChart();
       }
-      updateTodayBadge();
+      updateTodayBadge(stats);
     }
     
-    // Separate log rendering for performance
     function renderLog(){
       const grouped = {};
       state.entries.forEach(e => {
@@ -934,7 +891,7 @@
                           <div class="set-item">
                             <div class="set-info">
                               <strong>${e.reps} reps</strong>
-                              ${e.note ? `<span style="color:var(--muted);margin-left:8px">${e.note}</span>` : ''}
+                              ${e.note ? `<span style="color:var(--muted);margin-left:8px">${escapeHtml(e.note)}</span>` : ''}
                             </div>
                             <div class="set-actions">
                               <button data-id="${e.id}" class="ghost edit-btn">Edit</button>
@@ -1069,10 +1026,12 @@
       });
     }
     
-    // Modal for editing
     function showEditModal(entryId){
       const entry = state.entries.find(x => x.id === entryId);
-      if(!entry) return;
+      if(!entry) {
+          showError('Entry not found for editing.');
+          return;
+      }
       
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -1096,36 +1055,42 @@
       const cancelBtn = overlay.querySelector('#cancelEdit');
       const repsInput = overlay.querySelector('#editReps');
       
-      // Focus first input
       repsInput.focus();
       repsInput.select();
       
-      // Save function
       const handleSave = () => {
+        setLoading('saveEdit', true, 'Saving...');
         const reps = Number(repsInput.value);
-        const note = overlay.querySelector('#editNote').value.trim();
+        // Apply XSS escape to notes
+        const note = escapeHtml(overlay.querySelector('#editNote').value.trim());
         
         if(!reps || reps < 1){
-          console.error('Please enter valid reps'); 
+          showError('Please enter a valid number of reps (1 or more).'); 
+          setLoading('saveEdit', false, 'Save');
           return;
         }
         
-        // Update state object, then save
-        const newState = { ...state };
-        const entryToUpdate = newState.entries.find(x => x.id === entryId);
-        if(entryToUpdate){
-            entryToUpdate.reps = reps;
-            entryToUpdate.note = note;
+        try {
+            const newState = { ...state };
+            const entryToUpdate = newState.entries.find(x => x.id === entryId);
+            if(entryToUpdate){
+                entryToUpdate.reps = reps;
+                entryToUpdate.note = note;
+            }
+            // No need to recalculate PRs here, render() handles it on save
+            saveState(newState);
+            overlay.remove();
+            showSuccess('Set updated successfully.');
+        } catch(e) {
+            showError('Failed to save set changes.');
+        } finally {
+            setLoading('saveEdit', false, 'Save');
         }
-        
-        saveState(newState);
-        overlay.remove();
       };
       
       saveBtn.addEventListener('click', handleSave);
       cancelBtn.addEventListener('click', () => overlay.remove());
       
-      // Keyboard shortcuts
       overlay.addEventListener('keydown', (e) => {
         if(e.key === 'Escape'){
           overlay.remove();
@@ -1139,18 +1104,15 @@
       });
     }
 
-    // --- Events and Handlers ---
-
-    // Keyboard shortcuts - global
+    // --- EVENTS AND HANDLERS ---
+    
     document.addEventListener('keydown', (e) => {
-      // Ctrl/Cmd + K to focus reps input
       if((e.ctrlKey || e.metaKey) && e.key === 'k'){
         e.preventDefault();
         $('#reps').focus();
         $('#reps').select();
       }
       
-      // Escape to clear inputs
       if(e.key === 'Escape' && document.activeElement.id === 'reps'){
         $('#reps').value = '';
         $('#note').value = '';
@@ -1158,58 +1120,53 @@
       }
     });
     
-    // Keyboard navigation for collapsible sections
     document.addEventListener('keydown', (e) => {
       const target = e.target;
       
-      // Month headers
-      if(target.classList.contains('month-header')){
+      if(target.classList.contains('month-header') || target.classList.contains('day-header')){
         if(e.key === 'Enter' || e.key === ' '){
           e.preventDefault();
-          const monthKey = target.getAttribute('data-month');
-          toggleMonth(monthKey);
-        }
-      }
-      
-      // Day headers
-      if(target.classList.contains('day-header')){
-        if(e.key === 'Enter' || e.key === ' '){
-          e.preventDefault();
-          const date = target.getAttribute('data-date');
-          toggleDay(date);
+          if(target.classList.contains('month-header')) toggleMonth(target.getAttribute('data-month'));
+          if(target.classList.contains('day-header')) toggleDay(target.getAttribute('data-date'));
         }
       }
     });
     
     $('#addBtn').addEventListener('click', () => {
-      if(!isStorageReady) return console.warn("Storage not ready");
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
 
+      setLoading('addBtn', true, 'Adding...');
+      
       const date = $('#date').value || todayISO();
       const reps = Number($('#reps').value);
-      if(!reps || reps < 1) return console.error('Enter reps');
+      if(!reps || reps < 1) {
+          setLoading('addBtn', false, 'Add Set');
+          return showError('Please enter a valid number of reps (1 or more).');
+      }
       
-      const note = $('#note').value.trim();
+      // Apply XSS escape to notes
+      const note = escapeHtml($('#note').value.trim());
       const entry = { id: crypto.randomUUID(), date, reps, note, createdAt: Date.now() };
       
-      // Check for achievements before adding
-      const oldTotal = state.entries.reduce((a,b)=>a+b.reps,0);
-      const oldTodayTotal = state.entries.filter(e=>e.date===date).reduce((a,b)=>a+b.reps,0);
-      const oldHighestSet = state.entries.length > 0 ? Math.max(...state.entries.map(e => e.reps)) : 0;
+      // Get Old Stats BEFORE adding new entry (Achievement Detection Timing Bug fix)
+      const oldStats = calculateAllStats(state.entries);
+      const oldTodayTotal = oldStats.dailyTotals[date] || 0;
+      const oldHighestSet = oldStats.highestSet;
+      const oldHighestDailyTotal = oldStats.highestDailyTotal;
+      const oldHighestWeeklyTotal = oldStats.highestWeeklyTotal;
+      const oldTotal = oldStats.totalReps;
+      const oldStreak = calculateStreak(state.entries); // Pass entries to fixed function
       
       const newState = { ...state, entries: [...state.entries, entry] };
-      
-      // Update PRs that rely on historical or current data
-      calculateHighestDailyTotal(newState.entries);
-      updateWeeklyComparison(); 
-      // saveState is now synchronous (note: PR calculation functions mutate state)
       saveState(newState); 
-      
-      $('#reps').value = '';
-      $('#note').value = '';
-      $('#reps').focus();
-      
-      // Check achievements after adding
-      const newTodayTotal = oldTodayTotal + reps;
+
+      // Calculate New Stats AFTER adding entry
+      const newStats = calculateAllStats(newState.entries);
+      const newTodayTotal = newStats.dailyTotals[date];
+      const newTotal = newStats.totalReps;
+      const newStreak = calculateStreak(newState.entries); // Pass entries to fixed function
+
+      // Achievement Checks
       const target = Number($('#dailyTarget').value)||0;
       
       // Target achieved
@@ -1223,30 +1180,34 @@
       }
       
       // New personal record (Highest Daily Total)
-      if(newTodayTotal > state.highestDailyTotal){
+      if(newTodayTotal > oldHighestDailyTotal){
          showAchievement('daily_pr', newTodayTotal);
-         // Note: state.highestDailyTotal was updated by calculateHighestDailyTotal
       }
       
-      // New streak milestone (every 5 days)
-      const oldStreak = calculateStreak(); // Calculate before saveState was synchronous, now calculate after, relying on render to use the current state
-      const newStreak = calculateStreak(); 
-      if(newStreak > oldStreak && newStreak >= 5 && newStreak % 5 === 0){
+      // New personal record (Highest Weekly Total)
+      if(newStats.currentWeekTotal > oldHighestWeeklyTotal){
+          showAchievement('weekly_pr', newStats.currentWeekTotal);
+      }
+      
+      // New streak milestone
+      if(newStreak > oldStreak && newStreak >= CONSTANTS.STREAK_ACHIEVEMENT_STEP && newStreak % CONSTANTS.STREAK_ACHIEVEMENT_STEP === 0){
         showAchievement('streak', newStreak);
       }
       
       // Total reps milestones
-      const newTotal = oldTotal + reps;
-      const milestones = [100, 250, 500, 1000, 2500, 5000, 10000];
-      for(const milestone of milestones){
+      for(const milestone of CONSTANTS.MILESTONES){
         if(oldTotal < milestone && newTotal >= milestone){
           showAchievement('milestone', milestone);
           break;
         }
       }
+      
+      $('#reps').value = '';
+      $('#note').value = '';
+      $('#reps').focus();
+      setLoading('addBtn', false, 'Add Set');
     });
     
-    // Enter key to add set
     $('#reps').addEventListener('keydown', (e) => {
       if(e.key === 'Enter'){
         e.preventDefault();
@@ -1261,13 +1222,13 @@
       }
     });
 
-    function updateTodayBadge(){
-      const t = totalsFor(todayISO());
-      $('#todayTotal').textContent = `Today: ${t.dayTotal}`;
+    function updateTodayBadge(stats){
+      const dayTotal = stats.dailyTotals[todayISO()] || 0;
+      $('#todayTotal').textContent = `Today: ${dayTotal}`;
     }
 
     $('#clearTodayBtn').addEventListener('click', () => {
-      if(!isStorageReady) return;
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       
       const d = $('#date').value || todayISO();
       const showClearConfirm = () => {
@@ -1286,13 +1247,22 @@
           document.body.appendChild(overlay);
 
           overlay.querySelector('#confirmClear').addEventListener('click', () => {
-            const newState = { 
-              ...state, 
-              entries: state.entries.filter(e => e.date !== d) 
-            };
-            // saveState is now synchronous
-            saveState(newState); 
-            overlay.remove();
+            setLoading('confirmClear', true, 'Deleting...');
+            try {
+                const newState = { 
+                  ...state, 
+                  entries: state.entries.filter(e => e.date !== d) 
+                };
+                saveState(newState); 
+                overlay.remove();
+                showSuccess(`All sets for ${d} deleted.`);
+            } catch (e) {
+                showError('Failed to clear today\'s sets.');
+            } finally {
+                // Since this button is inside a modal, we only need to reset the state if the modal is still open
+                // For user experience, we can reset all related buttons after the operation if they were tracked.
+                // In this case, we rely on the modal closing and the next interaction.
+            }
           });
           overlay.querySelector('#cancelClear').addEventListener('click', () => overlay.remove());
           overlay.addEventListener('click', (e) => {
@@ -1302,16 +1272,6 @@
         showClearConfirm();
     });
 
-    $('#dailyTarget').addEventListener('change', () => {
-      if(!isStorageReady) return;
-      
-      const target = Number($('#dailyTarget').value)||0;
-      const newState = { ...state, target: target };
-      // saveState is now synchronous
-      saveState(newState); 
-    });
-    
-    // Debounce target input for better performance
     let targetDebounce = null;
     $('#dailyTarget').addEventListener('input', () => {
       if(!isStorageReady) return;
@@ -1320,13 +1280,12 @@
       targetDebounce = setTimeout(() => {
         const target = Number($('#dailyTarget').value)||0;
         const newState = { ...state, target: target };
-        // saveState is now synchronous
         saveState(newState); 
-      }, 500);
+      }, CONSTANTS.TARGET_DEBOUNCE_MS);
     });
 
     $('#logContainer').addEventListener('click', (e) => {
-      if(!isStorageReady) return;
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
 
       const btn = e.target.closest('button');
       if(!btn) return;
@@ -1342,20 +1301,28 @@
               <p>Are you sure you want to permanently delete this set?</p>
               <div class="modal-buttons">
                 <button class="ghost" id="cancelDelete">Cancel</button>
-                <button class="danger" id="confirmDelete">Delete</button>
+                <button class="danger" id="confirmDelete" data-id="${id}">Delete</button>
               </div>
             </div>
           `;
           document.body.appendChild(overlay);
 
           overlay.querySelector('#confirmDelete').addEventListener('click', () => {
-            const newState = { 
-              ...state, 
-              entries: state.entries.filter(x => x.id !== id) 
-            };
-            // saveState is now synchronous
-            saveState(newState); 
-            overlay.remove();
+            setLoading('confirmDelete', true, 'Deleting...');
+            try {
+                const entryIdToDelete = overlay.querySelector('#confirmDelete').getAttribute('data-id');
+                const newState = { 
+                  ...state, 
+                  entries: state.entries.filter(x => x.id !== entryIdToDelete) 
+                };
+                saveState(newState); 
+                overlay.remove();
+                showSuccess('Set deleted successfully.');
+            } catch (e) {
+                showError('Failed to delete set.');
+            } finally {
+                setLoading('confirmDelete', false, 'Delete');
+            }
           });
           overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
           overlay.addEventListener('click', (e) => {
@@ -1371,145 +1338,119 @@
     });
 
     $('#expandAllBtn').addEventListener('click', () => {
-      document.querySelectorAll('.month-content').forEach(el => {
+      document.querySelectorAll('.month-content, .day-sets').forEach(el => {
         el.style.display = 'block';
       });
-      document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
-        el.textContent = '▲';
-      });
-      document.querySelectorAll('.day-sets').forEach(el => {
-        el.style.display = 'block';
-      });
-      document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      document.querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
         el.textContent = '▲';
       });
     });
 
     $('#collapseAllBtn').addEventListener('click', () => {
-      document.querySelectorAll('.month-content').forEach(el => {
+      document.querySelectorAll('.month-content, .day-sets').forEach(el => {
         el.style.display = 'none';
       });
-      document.querySelectorAll('[id^="month-arrow-"]').forEach(el => {
-        el.textContent = '▼';
-      });
-      document.querySelectorAll('.day-sets').forEach(el => {
-        el.style.display = 'none';
-      });
-      document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+      document.querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
         el.textContent = '▼';
       });
     });
 
     // Export/Import/Reset
     $('#exportBtn').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'pushup-tracker-backup.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
+      try {
+          // Export includes current calculated PRs for robust backup
+          const stats = calculateAllStats(state.entries);
+          const exportState = {
+              ...state,
+              highestSet: stats.highestSet,
+              highestDailyTotal: stats.highestDailyTotal,
+              highestWeeklyTotal: stats.highestWeeklyTotal,
+          };
+          const blob = new Blob([JSON.stringify(exportState,null,2)], {type:'application/json'});
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'pushup-tracker-backup.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+      } catch (e) {
+          showError('Failed to export data.');
+      }
     });
 
     $('#importBtn').addEventListener('click', async () => {
-      if(!isStorageReady) return;
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
+
+      const fileInput = $('#importFile');
+      const f = fileInput.files[0];
+      if(!f) return showWarning('Please choose a JSON file first.');
       
-      const f = $('#importFile').files[0];
-      if(!f) return console.error('Choose a JSON file first');
+      setLoading('importBtn', true, 'Importing...');
       
-      const text = await f.text();
       try{
+        const text = await f.text();
         const data = JSON.parse(text);
         
-        // Validate imported data
         if(!data || typeof data !== 'object' || !Array.isArray(data.entries)){
           throw new Error('Invalid file format or missing entries array.');
         }
         
-        // Validate each entry has required fields
-        for(const entry of data.entries){
-          if(!entry.id || !entry.date || typeof entry.reps !== 'number'){
-            throw new Error('Invalid entry format in file');
-          }
-        }
-        
-        // Prepare new state object, ensuring new fields are present
+        // Use imported target/streak, ignore old PR fields as they are recalculated
         const newState = { 
           entries: data.entries, 
           target: Number(data.target) || 30,
-          lastStreak: data.lastStreak || 0,
-          highestWeeklyTotal: Number(data.highestWeeklyTotal) || 0,
-          highestDailyTotal: Number(data.highestDailyTotal) || 0, // Include daily total in import
+          lastStreak: Number(data.lastStreak) || 0,
         };
 
-        // saveState is now synchronous
-        saveState(newState); 
+        // Recalculate PRs on import 
+        calculateAllStats(newState.entries);
         
-        const successOverlay = document.createElement('div');
-        successOverlay.className = 'modal-overlay';
-        successOverlay.innerHTML = `
-          <div class="modal" style="text-align:center">
-            <div style="font-size:48px;margin-bottom:16px">✔</div>
-            <!-- Updated success message -->
-            <h3>Import Successful</h3>
-            <p style="color:var(--muted);margin:16px 0">Data imported and saved to local storage.</p>
-            <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
-          </div>
-        `;
-        document.body.appendChild(successOverlay);
-        setTimeout(() => successOverlay.remove(), 3000);
+        saveState(newState); 
+        fileInput.value = ''; // Clear file input
+        showSuccess('Data imported and saved to local storage. Stats recalculated.');
         
       }catch(err){ 
         console.error('Import failed:', err);
-        const errorOverlay = document.createElement('div');
-        errorOverlay.className = 'modal-overlay';
-        errorOverlay.innerHTML = `
-          <div class="modal" style="text-align:center">
-            <h3 style="color:var(--bad)">Import Failed</h3>
-            <p style="color:var(--muted);margin:16px 0">${err.message || 'An unknown error occurred during import.'}</p>
-            <button class="primary" onclick="this.closest('.modal-overlay').remove()">Close</button>
-          </div>
-        `;
-        document.body.appendChild(errorOverlay);
+        showError(err.message || 'An unknown error occurred during import. Check console for details.');
+      } finally {
+          setLoading('importBtn', false, 'Import');
       }
     });
 
-    // ADDED: Manual backup trigger
     $('#backupBtn').addEventListener('click', async () => {
-      $('#backupBtn').textContent = 'Sending...';
-      $('#backupBtn').disabled = true;
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
+      
+      setLoading('backupBtn', true, 'Sending...');
 
       try {
           const response = await sendBackupEmail();
           if (response.status === 200) {
-              alertMessage('Backup Success', 'Your push-up data has been successfully emailed.', 'ok');
+              showSuccess('Your push-up data has been successfully emailed.');
           } else if (response.status === 400 && response.text === 'Skipped - Not Configured') {
-              alertMessage('Backup Skipped', 'EmailJS is not configured. Please ensure your keys are correct.', 'warn');
+              // Warning already shown inside sendBackupEmail
           } else {
-              alertMessage('Backup Failed', 'An error occurred during email transmission. Check console for details.', 'bad');
+              showError('An error occurred during email transmission. Check console for details.');
           }
       } catch (e) {
-          alertMessage('Backup Failed', 'An unexpected error occurred.', 'bad');
+          showError(e.message || 'An unexpected error occurred during backup. Check console for details.');
       } finally {
-          $('#backupBtn').textContent = 'Manual Email Backup';
-          $('#backupBtn').disabled = false;
+          setLoading('backupBtn', false, 'Manual Email Backup');
       }
     });
 
     $('#resetBtn').addEventListener('click', () => {
-      if(!isStorageReady) return;
+      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       
-      // Show warning modal with double confirmation
+      const stats = calculateAllStats(state.entries);
+      const totalReps = stats.totalReps;
+
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       
-      const totalReps = state.entries.reduce((a,b)=>a+b.reps,0);
-
       overlay.innerHTML = `
         <div class="modal">
           <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
           <div class="warning-banner">
             <div>
-              <!-- Updated warning message -->
               <strong>Warning:</strong> This will permanently delete all your push-up data (${state.entries.length} sets, ${totalReps} reps) from local storage.
             </div>
           </div>
@@ -1541,27 +1482,18 @@
       });
       
       confirmBtn.addEventListener('click', () => {
-        // Reset state to empty defaults and save to storage
-        const newState = { entries: [], target: 30, lastStreak: 0, highestWeeklyTotal: 0, highestDailyTotal: 0 };
-        // saveState is now synchronous
-        saveState(newState); 
-        
-        overlay.remove();
-        
-        // Show confirmation
-        const successOverlay = document.createElement('div');
-        successOverlay.className = 'modal-overlay';
-        successOverlay.innerHTML = `
-          <div class="modal" style="text-align:center">
-            <div style="font-size:48px;margin-bottom:16px">✔</div>
-            <!-- Updated success message -->
-            <h3>Data Reset Complete</h3>
-            <p style="color:var(--muted);margin:16px 0">All data has been deleted from local storage.</p>
-            <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
-          </div>
-        `;
-        document.body.appendChild(successOverlay);
-        setTimeout(() => successOverlay.remove(), 3000);
+        setLoading('confirmResetBtn', true, 'Deleting...');
+        try {
+            const newState = { entries: [], target: 30, lastStreak: 0 };
+            saveState(newState); 
+            
+            overlay.remove();
+            showSuccess('All data has been deleted from local storage.');
+        } catch (e) {
+            showError('Failed to reset data.');
+        } finally {
+            setLoading('confirmResetBtn', false, 'Delete Everything');
+        }
       });
       
       overlay.addEventListener('click', (e) => {
@@ -1579,11 +1511,14 @@
 
     // Event delegation for month/day toggles
     document.getElementById('logContainer').addEventListener('click', (e) => {
-        if (e.target.classList.contains('month-header')) {
-            const monthKey = e.target.getAttribute('data-month');
+        const header = e.target.closest('.month-header, .day-header');
+        if (!header) return;
+
+        if (header.classList.contains('month-header')) {
+            const monthKey = header.getAttribute('data-month');
             if (monthKey) toggleMonth(monthKey);
-        } else if (e.target.classList.contains('day-header')) {
-            const date = e.target.getAttribute('data-date');
+        } else if (header.classList.contains('day-header')) {
+            const date = header.getAttribute('data-date');
             if (date) toggleDay(date);
         }
     });
