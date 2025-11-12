@@ -29,25 +29,31 @@
     @media (min-width: 1024px) {
         main {
             grid-template-columns: 350px 1fr; /* Fixed narrow left column, fluid wide right column */
-            /* UPDATED GRID AREAS: Log subsumed into Data */
+            /* UPDATED GRID AREAS: PRs (prs) now spans three rows (R2-R4) to align with Chart+Summary. */
             grid-template-areas: 
                 "addset chart"
-                "data chart"
-                "data prs"
-                "data summary"; 
+                "prs chart"
+                "prs summary" /* PRs spans down to align with summary bottom */
+                "prs summary"; /* PRs spans down to align with summary bottom (was data summary) */
             padding: 32px;
         }
         #addEntrySection { grid-area: addset; }
-        /* #logSection removed and its content moved into #dataSection */
-        #dataSection { grid-area: data; } /* Data now flows from end of AddSet down */
+        #prSection { 
+          grid-area: prs; 
+          /* Flex setup to make content stretch vertically */
+          display: flex;
+          flex-direction: column;
+          align-self: stretch; /* IMPORTANT: Allows the PR card to fill the entire grid area */
+        }
+        #dataSection { grid-area: data; } /* Remains hidden placeholder for bottom left */
 
-        #chartSection { grid-area: chart; }
-        #prSection { grid-area: prs; }
-        #summarySection { grid-area: summary; }
+        #chartSection { grid-area: chart; } /* Spans R1/R2 on the right */
+        #summarySection { grid-area: summary; } /* Spans R3/R4 on the right */
         
         /* Utility class to help position the PRs/Summary on the right */
-        #prSection { align-self: start; }
-        #summarySection { align-self: start; }
+        /* These are no longer needed as PRs and Summary are now explicitly spanning multiple rows */
+        /* #prSection { align-self: start; } */
+        /* #summarySection { align-self: start; } */
     }
     /* Two-column layout for tablets (768px to 1024px) */
     @media (min-width: 768px) and (max-width: 1023px) {
@@ -196,6 +202,35 @@
     
     /* Loading state */
     .updating{opacity:0.6;pointer-events:none;transition:opacity 0.2s}
+
+    /* --- NEW MENU CSS --- */
+    .menu-btn {
+        /* Style for the hamburger/menu icon button */
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--card);
+        border: 1px solid #222;
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+        margin-left: auto; /* Push the button to the right */
+        transition: background 0.2s;
+    }
+    .menu-btn:hover {
+        background: #1a1a1c;
+    }
+
+    /* Modal styles for the Data Menu */
+    #dataModal .modal {
+        max-width: 600px; /* Slightly wider modal for data */
+        padding: 24px;
+    }
+    #dataModal .modal h2 {
+        font-size: 24px;
+        margin-bottom: 24px;
+    }
+    /* --- END NEW MENU CSS --- */
+
   </style>
 </head>
 <body>
@@ -207,6 +242,10 @@
     <span class="pill" id="storageInfo">Local Storage</span>
     <div class="pill" id="weekInfo">Week: —</div>
     <div id="streakBadge"></div>
+    <!-- NEW MENU BUTTON -->
+    <button id="openDataMenuBtn" class="menu-btn" aria-label="Open Data and Backup Menu">
+      &#9776; <!-- Hamburger icon -->
+    </button>
   </header>
   <main id="appContent" class="updating">
     <div id="loadingIndicator" style="text-align:center;padding:50px;font-size:20px;color:var(--muted)">
@@ -251,7 +290,26 @@
       </div>
     </section>
     
-    <!-- Data Management (now including Log History) -->
+    <!-- PRs MOVED TO LEFT COLUMN (Under Add Set) -->
+    <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
+        <h2 id="prH">Personal Records (PRs)</h2>
+        <div class="pr-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
+            <div>
+              <label>Highest Single Set 💪</label>
+              <div class="status ok" id="highestSet">0</div>
+            </div>
+            <div>
+              <label>Highest Daily Total 🚀</label>
+              <div class="status ok" id="highestDailyTotal">0</div>
+            </div>
+            <div>
+              <label>Highest Weekly Total 🏆</label>
+              <div class="status ok" id="highestWeeklyTotal">0</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Management (HIDDEN - MOVED TO MODAL) -->
     <section class="card" aria-labelledby="dataH" style="display:none" data-section id="dataSection">
       <details>
         <summary id="dataH">Data Management & Backup</summary>
@@ -269,13 +327,13 @@
             <button id="resetBtn" class="danger">Reset all</button>
           </div>
           
-          <!-- LOG HISTORY (Nested Collapsible - Removed 'open' attribute) -->
-          <details>
+          <!-- LOG HISTORY (Nested Collapsible) -->
+          <details open id="logHistoryDetails">
             <summary style="font-size: 18px; font-weight: 600; color: var(--fg); padding: 0; list-style: none;">Log History & Totals</summary>
             <div style="margin-top: 16px;">
                 <div class="row" style="margin-bottom:16px">
-                    <button id="expandAllBtn" class="ghost">Expand all</button>
-                    <button id="collapseAllBtn" class="ghost">Collapse all</button>
+                    <button id="expandAllBtn">Expand all</button>
+                    <button id="collapseAllBtn">Collapse all</button>
                 </div>
                 <div id="logContainer"></div>
                 <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
@@ -315,25 +373,6 @@
           </select>
         </div>
       </div>
-    </section>
-
-    <!-- PRs MOVED TO RIGHT COLUMN (under chart) -->
-    <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
-        <h2 id="prH">Personal Records (PRs)</h2>
-        <div class="pr-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
-            <div>
-              <label>Highest Single Set 💪</label>
-              <div class="status ok" id="highestSet">0</div>
-            </div>
-            <div>
-              <label>Highest Daily Total 🚀</label>
-              <div class="status ok" id="highestDailyTotal">0</div>
-            </div>
-            <div>
-              <label>Highest Weekly Total 🏆</label>
-              <div class="status ok" id="highestWeeklyTotal">0</div>
-            </div>
-        </div>
     </section>
 
     <!-- Summary & Goals MOVED TO RIGHT COLUMN (under PRs) -->
@@ -392,6 +431,59 @@
       <div id="weeklyComparison" style="text-align:center;font-size:16px;color:var(--muted)"></div>
     </section>
   </main>
+
+  <!-- NEW DATA MANAGEMENT MODAL -->
+  <div class="modal-overlay" id="dataModal" style="display:none">
+    <div class="modal" role="dialog" aria-labelledby="dataModalTitle" aria-modal="true">
+      <h2 id="dataModalTitle">Data Management & Backup</h2>
+      
+      <!-- PASTE THE ENTIRE CONTENT OF THE OLD #dataSection HERE -->
+      <!-- The content below is the content that was originally inside <section id="dataSection"> -->
+      <div style="margin-top: 16px;">
+          
+        <!-- Data Management Buttons (Existing) -->
+        <h3 style="font-size:18px;margin:0 0 12px;color:var(--fg)">Backup & Import</h3>
+        <div class="row" style="margin-bottom:12px">
+          <button id="exportBtn">Export JSON</button>
+          <input type="file" id="importFile" accept="application/json" />
+          <button id="importBtn">Import</button>
+        </div>
+        <div class="row" style="margin-bottom: 24px;">
+          <button id="backupBtn" class="primary">Manual Email Backup</button>
+          <button id="resetBtn" class="danger">Reset all</button>
+        </div>
+        
+        <!-- LOG HISTORY (Nested Collapsible) -->
+        <details open id="logHistoryDetails">
+          <summary style="font-size: 18px; font-weight: 600; color: var(--fg); padding: 0; list-style: none;">Log History & Totals</summary>
+          <div style="margin-top: 16px;">
+              <div class="row" style="margin-bottom:16px">
+                  <button id="expandAllBtn">Expand all</button>
+                  <button id="collapseAllBtn">Collapse all</button>
+              </div>
+              <div id="logContainer"></div>
+              <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
+                  <strong>Total sets:</strong> <span id="totalSets">0</span> | 
+                  <strong>Total reps:</strong> <span id="totalReps">0</span>
+              </div>
+          </div>
+        </details>
+        
+        <!-- Raw JSON (Existing) -->
+        <details style="margin-top:24px">
+          <summary>See raw JSON</summary>
+          <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
+        </details>
+
+        <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your data is stored locally in your browser and is not synced. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
+      </div>
+
+      <div class="modal-buttons" style="justify-content:center;margin-top:32px">
+        <button class="primary" id="closeDataMenuBtn" style="min-width:150px">Close Menu</button>
+      </div>
+    </div>
+  </div>
+  <!-- END NEW DATA MANAGEMENT MODAL -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -495,7 +587,7 @@
     
     // Loading States fix
     function setLoading(buttonId, isLoading, originalText = null) {
-        const btn = $(`#${buttonId}`);
+        const btn = document.getElementById(buttonId); // Use direct ID lookup now that elements are in modal too
         if (btn) {
             btn.textContent = isLoading ? CONSTANTS.LOADING_TEXT : (originalText || btn.dataset.originalText || btn.textContent);
             btn.disabled = isLoading;
@@ -514,7 +606,12 @@
         loadingIndicator.style.display = show ? 'none' : 'block';
         
         document.querySelectorAll('[data-section]').forEach(el => {
-            el.style.display = show ? 'grid' : 'none';
+            // Only show sections that are part of the main grid
+            if(el.id !== 'dataSection') {
+                el.style.display = show ? 'grid' : 'none';
+            } else {
+                el.style.display = 'none'; // Always hide the old dataSection
+            }
         });
         
         $('#storageInfo').textContent = 'Local Storage (This Device)';
@@ -827,12 +924,16 @@
       el.textContent = `${pct}% of target`;
       el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
       
-      // Log totals
-      $('#totalSets').textContent = stats.totalSets;
-      $('#totalReps').textContent = stats.totalReps;
-
       // Weekly comparison
       updateWeeklyComparison(stats);
+
+      // Only update log totals/raw JSON if the modal is currently open
+      const dataModal = $('#dataModal');
+      if (dataModal && dataModal.style.display === 'flex') {
+          $('#totalSets').textContent = stats.totalSets;
+          $('#totalReps').textContent = stats.totalReps;
+          $('#raw').textContent = JSON.stringify(state,null,2);
+      }
     }
     
     function updateWeeklyComparison(stats){
@@ -873,6 +974,7 @@
       const stateStr = JSON.stringify(state.entries); 
       const needsFullRender = stateStr !== lastRenderedState;
       
+      // We still render the log here if needed, but it targets the modal's #logContainer
       if(needsFullRender){
         renderLog();
         lastRenderedState = stateStr;
@@ -890,8 +992,6 @@
       } else {
         streakEl.innerHTML = '';
       }
-
-      $('#raw').textContent = JSON.stringify(state,null,2);
       
       if(needsFullRender || !chartInstance){
         renderChart();
@@ -920,7 +1020,9 @@
 
       const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
 
-      const container = $('#logContainer');
+      const container = document.getElementById('logContainer'); // Target the ID which is now in the modal
+      if(!container) return; // Prevent error if modal is not in DOM yet
+      
       if(dates.length === 0){
         container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
       } else {
@@ -1385,14 +1487,38 @@
       }, CONSTANTS.TARGET_DEBOUNCE_MS);
     });
 
-    // Event delegation is still active on logContainer, which is now inside #dataSection
-    document.getElementById('logContainer').addEventListener('click', (e) => {
+    // Event delegation is now active on the modal's logContainer
+    document.getElementById('dataModal').addEventListener('click', (e) => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-
+      
       const btn = e.target.closest('button');
       if(!btn) return;
-      const id = btn.getAttribute('data-id');
       
+      // --- Log History Toggles (Delegation for elements inside the modal) ---
+      if (btn.id === 'expandAllBtn') {
+        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => {
+          el.style.display = 'block';
+        });
+        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
+          el.textContent = '▲';
+        });
+        return;
+      }
+
+      if (btn.id === 'collapseAllBtn') {
+        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => {
+          el.style.display = 'none';
+        });
+        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
+          el.textContent = '▼';
+        });
+        return;
+      }
+      
+      const id = btn.getAttribute('data-id');
+      if(!id) return; // Only process delete/edit buttons that have a data-id
+      
+      // --- Delete/Edit Set Buttons (Delegation) ---
       if(btn.classList.contains('del-btn')){
         const showDeleteConfirm = () => {
           const overlay = document.createElement('div');
@@ -1439,27 +1565,8 @@
       }
     });
     
-    // Log history toggle buttons still need to function
-    $('#expandAllBtn').addEventListener('click', () => {
-      document.querySelectorAll('.month-content, .day-sets').forEach(el => {
-        el.style.display = 'block';
-      });
-      document.querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
-        el.textContent = '▲';
-      });
-    });
-
-    $('#collapseAllBtn').addEventListener('click', () => {
-      document.querySelectorAll('.month-content, .day-sets').forEach(el => {
-        el.style.display = 'none';
-      });
-      document.querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => {
-        el.textContent = '▼';
-      });
-    });
-
-    // Event delegation for month/day toggles (kept, as it targets elements within logContainer)
-    document.getElementById('logContainer').addEventListener('click', (e) => {
+    // Event delegation for month/day toggles (kept, now inside modal delegation block)
+    document.getElementById('dataModal').addEventListener('click', (e) => {
         const header = e.target.closest('.month-header, .day-header');
         if (!header) return;
 
@@ -1471,9 +1578,11 @@
             if (date) toggleDay(date);
         }
     });
-    
-    // Export/Import/Reset
-    $('#exportBtn').addEventListener('click', () => {
+
+    // --- Data Management Button Handlers (Targeting buttons now in modal) ---
+
+    // Export Handler
+    document.getElementById('dataModal').querySelector('#exportBtn').addEventListener('click', () => {
       try {
           // Export includes current calculated PRs for robust backup
           const stats = calculateAllStats(state.entries);
@@ -1494,10 +1603,11 @@
       }
     });
 
-    $('#importBtn').addEventListener('click', async () => {
+    // Import Handler
+    document.getElementById('dataModal').querySelector('#importBtn').addEventListener('click', async () => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
 
-      const fileInput = $('#importFile');
+      const fileInput = document.getElementById('importFile');
       const f = fileInput.files[0];
       if(!f) return showWarning('Please choose a JSON file first.');
       
@@ -1533,7 +1643,8 @@
       }
     });
 
-    $('#backupBtn').addEventListener('click', async () => {
+    // Backup Handler
+    document.getElementById('dataModal').querySelector('#backupBtn').addEventListener('click', async () => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       
       setLoading('backupBtn', true, 'Sending...');
@@ -1554,7 +1665,8 @@
       }
     });
 
-    $('#resetBtn').addEventListener('click', () => {
+    // Reset Handler
+    document.getElementById('dataModal').querySelector('#resetBtn').addEventListener('click', () => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       
       const stats = calculateAllStats(state.entries);
@@ -1595,7 +1707,8 @@
       
       overlay.querySelector('.export-trigger').addEventListener('click', (e) => {
         e.preventDefault();
-        $('#exportBtn').click();
+        // Trigger export button inside the modal's context
+        document.getElementById('dataModal').querySelector('#exportBtn').click(); 
       });
       
       confirmBtn.addEventListener('click', () => {
@@ -1606,6 +1719,7 @@
             
             overlay.remove();
             showSuccess('All data has been deleted from local storage.');
+            closeDataMenu(); // Close the main data modal after reset
         } catch (e) {
             showError('Failed to reset data.');
         } finally {
@@ -1618,8 +1732,49 @@
       });
     });
 
+    // Chart days listener remains in the main flow
     $('#chartDays').addEventListener('change', () => {
       renderChart();
+    });
+
+    // --- MODAL EVENT HANDLERS (New) ---
+    const dataModal = $('#dataModal');
+
+    function openDataMenu() {
+        dataModal.style.display = 'flex';
+        
+        // Ensure log history is rendered and stats are updated when opening
+        renderLog(); 
+        const stats = calculateAllStats(state.entries);
+        $('#totalSets').textContent = stats.totalSets;
+        $('#totalReps').textContent = stats.totalReps;
+        $('#raw').textContent = JSON.stringify(state,null,2); 
+        
+        // Focus the close button for accessibility
+        $('#closeDataMenuBtn').focus();
+    }
+
+    function closeDataMenu() {
+        dataModal.style.display = 'none';
+        // Re-render the main content to ensure all stats are current after any changes
+        scheduleRender(); 
+    }
+
+    $('#openDataMenuBtn').addEventListener('click', openDataMenu);
+    
+    // Attach close listener to the new button inside the modal
+    $('#closeDataMenuBtn').addEventListener('click', closeDataMenu);
+    
+    // Close modal on outside click
+    dataModal.addEventListener('click', (e) => {
+        if(e.target === dataModal) closeDataMenu();
+    });
+    
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape' && dataModal.style.display === 'flex'){
+            closeDataMenu();
+        }
     });
 
     // --- Init ---
