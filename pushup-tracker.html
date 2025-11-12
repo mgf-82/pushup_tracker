@@ -266,6 +266,7 @@
     /* --- END NEW MENU CSS --- */
 
   </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
   <header>
@@ -291,7 +292,10 @@
       <div>
         <div style="margin-bottom: 16px;">
           <label for="date">Date</label>
-          <input id="date" type="date" />
+          <div style="position:relative;display:flex;align-items:center;">
+  <input id="date" type="text" class="date-picker" placeholder="Select date" style="width:100%;padding-right:40px;">
+  <span id="calendarIcon" role="button" aria-label="Open calendar" tabindex="0" style="position:absolute;right:12px;cursor:pointer;font-size:20px;color:var(--muted);">📅</span>
+</div>
         </div>
         <div style="margin-bottom: 16px;">
           <label for="reps">Reps</label>
@@ -2101,6 +2105,73 @@
     });
   }
 })();
+// --- Flatpickr custom date picker ---
+(function(){
+  function initDatePicker(){
+    if (typeof flatpickr === 'undefined') return;
+    const el = document.getElementById('date');
+    if (!el || el._fp) return; // prevent double init
+    flatpickr(el, {
+      dateFormat: 'Y-m-d',         // keep ISO format for existing logic
+      defaultDate: todayISO(),     // sync with app's default
+      allowInput: true,            // allow manual typing if desired
+      clickOpens: true,
+      weekNumbers: true,
+      disableMobile: true          // force custom picker on mobile too
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDatePicker);
+  } else {
+    initDatePicker();
+  }
+  // Re-initialize if the Add Set card is dynamically shown later
+  const obs = new MutationObserver(initDatePicker);
+  obs.observe(document.body, { childList: true, subtree: true });
+})();
+
+// --- Make calendar icon clickable, robust init ---
+(function setupIconTrigger(){
+  function bind(){
+    const icon = document.getElementById('calendarIcon');
+    const input = document.getElementById('date');
+    if (!icon || !input) return;
+    function openPicker(){
+      try{
+        if (input._flatpickr) {
+          input._flatpickr.open();
+          return;
+        }
+        if (typeof flatpickr !== 'undefined') {
+          const inst = flatpickr(input, {
+            dateFormat: 'Y-m-d',
+            defaultDate: todayISO(),
+            allowInput: true,
+            clickOpens: true,
+            weekNumbers: true,
+            disableMobile: true
+          });
+          if (inst) inst.open();
+          return;
+        }
+      } catch(e){}
+      input.focus();
+    }
+    icon.addEventListener('click', openPicker);
+    icon.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openPicker();
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind);
+  } else {
+    bind();
+  }
+})();
+
 </script>
 </body>
 </html>
