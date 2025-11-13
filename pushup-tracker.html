@@ -261,6 +261,7 @@
           -->
           <option value="Push-up" selected>Push-up</option>
           <option value="Ab Wheel">Ab Wheel</option>
+          <option value="Squat">Squat</option>
           <!-- <option value="Squat">Squat</option> -->
         </select>
       </div>
@@ -516,18 +517,27 @@
             },
             defaultTarget: 20
         },
+        'Squat': {
+            types: ['Bodyweight', 'Goblet Squat', 'Back Squat', 'Front Squat', 'Other'],
+            prDefinitions: {
+                'Bodyweight':   { key: 'pr_squat_body',     label: 'Max Bodyweight Set' },
+                'Goblet Squat': { key: 'pr_squat_goblet',   label: 'Max Goblet Squat Set' },
+                'Back Squat':   { key: 'pr_squat_back',     label: 'Max Back Squat Set' },
+                'Front Squat':  { key: 'pr_squat_front',    label: 'Max Front Squat Set' }
+            },
+            defaultTarget: 50
+        }
         // --- HOW TO ADD A NEW EXERCISE ---
         // 1. Add an <option> to the #exerciseSelect in the HTML.
         // 2. Add its config here:
         /*
-        'Squat': {
-            types: ['Bodyweight', 'Goblet', 'Barbell', 'Other'],
+        'New Exercise': {
+            types: ['Type A', 'Type B', 'Other'],
             prDefinitions: {
-                'Bodyweight': { key: 'pr_squat_body', label: 'Max Bodyweight Set' },
-                'Goblet':     { key: 'pr_squat_goblet', label: 'Max Goblet Set' },
-                'Barbell':    { key: 'pr_squat_barbell', label: 'Max Barbell Set' }
+                'Type A': { key: 'pr_new_a', label: 'Max Type A Set' },
+                'Type B': { key: 'pr_new_b', label: 'Max Type B Set' }
             },
-            defaultTarget: 50
+            defaultTarget: 40
         }
         */
     };
@@ -588,6 +598,55 @@
     let lastRenderedState = null;
     
     const $ = sel => document.querySelector(sel);
+    
+    // --- [NEW] DATE UTILITIES ---
+    /**
+     * Formats an ISO date (yyyy-mm-dd) to dd-mm-yyyy
+     * @param {string} isoDate - The date string in yyyy-mm-dd format
+     * @returns {string} The date string in dd-mm-yyyy format or '—'
+     */
+    function formatDateForDisplay(isoDate) {
+        if (!isoDate || isoDate === '—') return '—';
+        try {
+            // Handle week ranges (e.g., "yyyy-mm-dd → yyyy-mm-dd")
+            if (isoDate.includes(' → ')) {
+                const parts = isoDate.split(' → ');
+                return `${formatDateForDisplay(parts[0])} → ${formatDateForDisplay(parts[1])}`;
+            }
+            const [y, m, d] = isoDate.split('-');
+            if (!y || !m || !d || y.length !== 4) return isoDate; // Return original if not in expected format
+            return `${d}-${m}-${y}`;
+        } catch (e) {
+            console.warn(`Could not format date: ${isoDate}`, e);
+            return isoDate; // Return original on error
+        }
+    }
+
+    /**
+     * Parses a display date (dd-mm-yyyy) to ISO format (yyyy-mm-dd)
+     * @param {string} displayDate - The date string in dd-mm-yyyy format
+     * @returns {string} The date string in yyyy-mm-dd format
+     */
+    function parseDateFromDisplay(displayDate) {
+        if (!displayDate) return todayISO();
+        try {
+            const [d, m, y] = displayDate.split('-');
+            if (!y || !m || !d || y.length !== 4) return displayDate; // Return original if not in expected format
+            return `${y}-${m}-${d}`;
+        } catch (e) {
+            console.warn(`Could not parse date: ${displayDate}`, e);
+            return todayISO(); // Fallback on error
+        }
+    }
+    
+    /**
+     * Gets today's date in dd-mm-yyyy format
+     * @returns {string} Today's date as dd-mm-yyyy
+     */
+    function todayDisplay() {
+        return formatDateForDisplay(todayISO());
+    }
+    // --- END NEW DATE UTILITIES ---
     
     // --- UTILITIES ---
 
@@ -692,6 +751,9 @@
             if (!globalState['Ab Wheel']) {
                  globalState['Ab Wheel'] = createDefaultState('Ab Wheel');
             }
+            if (!globalState['Squat']) {
+                 globalState['Squat'] = createDefaultState('Squat');
+            }
             
             // Recalculate PRs for the loaded pushup data
             calculateAllStats(globalState['Push-up'].entries, globalState['Push-up']); 
@@ -770,6 +832,11 @@
         
         // [NEW] Get the PR definitions for the current exercise
         const config = EXERCISE_CONFIG[currentExercise];
+        // Gracefully handle missing config, although this shouldn't happen
+        if (!config) {
+            console.error(`Missing config for: ${currentExercise}`);
+            return {}; 
+        }
         const prDefinitions = config.prDefinitions;
         
         const stats = {
@@ -902,7 +969,9 @@
       
       // Recalculate stats for *all* exercises before backup
       for (const ex in globalState) {
-        calculateAllStats(globalState[ex].entries, globalState[ex]);
+        if (globalState[ex]) { // Check if state exists
+            calculateAllStats(globalState[ex].entries, globalState[ex]);
+        }
       }
       
       const fullStateForBackup = { 
@@ -912,8 +981,8 @@
 
       const templateParams = {
           subject: `${currentExercise} Tracker Backup - ${new Date().toLocaleDateString()}`,
-          totalReps: stats.totalReps,
-          totalSets: stats.totalSets,
+          totalReps: stats.totalReps || 0,
+          totalSets: stats.totalSets || 0,
           backupTime: exportDate,
           backupData: JSON.stringify(fullStateForBackup, null, 2),
       };
@@ -1055,6 +1124,8 @@
         if (!container) return;
 
         const config = EXERCISE_CONFIG[currentExercise];
+        if (!config) return; // Exit if no config
+        
         const prDefinitions = config.prDefinitions;
         let html = '';
 
@@ -1070,7 +1141,7 @@
                   <span class="pr-label">${prLabel}</span>
                   <div class="pr-value">
                     <span>${prData.reps}</span>
-                    <span class="pr-date">${prData.date}</span>
+                    <span class="pr-date">${formatDateForDisplay(prData.date)}</span>
                   </div>
                 </div>
             `;
@@ -1082,34 +1153,36 @@
      * [REFACTORED] Updates all stats in the UI
      */
     function updateStats(stats){
-      const targetDate = $('#date').value || todayISO();
+      if (!stats) return; // Guard against missing stats
+      const displayDate = $('#date').value || todayDisplay();
+      const targetDate = parseDateFromDisplay(displayDate);
       
       // Summary & Totals
-      $('#dailyTotal').textContent = stats.dailyTotals[targetDate] || 0;
-      $('#weeklyTotal').textContent = stats.currentWeekTotal;
-      $('#allTimeTotal').textContent = stats.totalReps;
+      $('#dailyTotal').textContent = (stats.dailyTotals && stats.dailyTotals[targetDate]) || 0;
+      $('#weeklyTotal').textContent = stats.currentWeekTotal || 0;
+      $('#allTimeTotal').textContent = stats.totalReps || 0;
       
       // General PRs
-      $('#highestSetReps').textContent = stats.pr_set.reps;
-      $('#highestSetDate').textContent = stats.pr_set.date;
+      $('#highestSetReps').textContent = stats.pr_set ? stats.pr_set.reps : 0;
+      $('#highestSetDate').textContent = formatDateForDisplay(stats.pr_set ? stats.pr_set.date : '—');
       
-      $('#highestDailyTotalReps').textContent = stats.pr_day.reps;
-      $('#highestDailyTotalDate').textContent = stats.pr_day.date;
+      $('#highestDailyTotalReps').textContent = stats.pr_day ? stats.pr_day.reps : 0;
+      $('#highestDailyTotalDate').textContent = formatDateForDisplay(stats.pr_day ? stats.pr_day.date : '—');
       
-      $('#highestWeeklyTotalReps').textContent = stats.pr_week.reps;
-      const weeklyPRDate = stats.pr_week.date !== '—' ? wkRange(stats.pr_week.date).join(' → ') : '—';
+      $('#highestWeeklyTotalReps').textContent = stats.pr_week ? stats.pr_week.reps : 0;
+      const weeklyPRDate = (stats.pr_week && stats.pr_week.date !== '—') ? formatDateForDisplay(wkRange(stats.pr_week.date).join(' → ')) : '—';
       $('#highestWeeklyTotalDate').textContent = weeklyPRDate;
 
       // [NEW] Call the dynamic PR list renderer
       renderPRList(stats);
       
       // Other Metrics
-      $('#avgSet').textContent = stats.avgSet;
-      $('#setsToday').textContent = stats.currentSetsToday;
+      $('#avgSet').textContent = stats.avgSet || 0;
+      $('#setsToday').textContent = stats.currentSetsToday || 0;
       
       // Target status
       const target = Number($('#dailyTarget').value)||0;
-      const dayTotal = stats.dailyTotals[todayISO()] || 0;
+      const dayTotal = (stats.dailyTotals && stats.dailyTotals[todayISO()]) || 0;
       const pct = target ? Math.round((dayTotal/target)*100) : 0;
       const el = $('#targetStatus');
       el.textContent = `${pct}% of target`;
@@ -1119,15 +1192,15 @@
 
       const dataModal = $('#dataModal');
       if (dataModal && dataModal.style.display === 'flex') {
-          $('#totalSets').textContent = stats.totalSets;
-          $('#totalReps').textContent = stats.totalReps;
+          $('#totalSets').textContent = stats.totalSets || 0;
+          $('#totalReps').textContent = stats.totalReps || 0;
           $('#raw').textContent = JSON.stringify(state,null,2); 
       }
     }
     
     function updateWeeklyComparison(stats){
-      const thisWeekTotal = stats.currentWeekTotal;
-      const lastWeekTotal = stats.lastWeekTotal;
+      const thisWeekTotal = stats.currentWeekTotal || 0;
+      const lastWeekTotal = stats.lastWeekTotal || 0;
       $('#thisWeekTotal').textContent = thisWeekTotal;
       $('#lastWeekTotal').textContent = lastWeekTotal;
       const diff = thisWeekTotal - lastWeekTotal;
@@ -1167,10 +1240,11 @@
     }
 
     function render(){
-      $('#date').value ||= todayISO();
+      $('#date').value ||= todayDisplay();
       $('#dailyTarget').value = state.target;
       
-      const currentTargetDate = $('#date').value || todayISO();
+      const displayDate = $('#date').value || todayDisplay();
+      const currentTargetDate = parseDateFromDisplay(displayDate);
       const stats = calculateAllStats(state.entries, state, currentTargetDate);
 
       const stateStr = JSON.stringify(state.entries); 
@@ -1184,7 +1258,7 @@
       updateStats(stats); // This now calls renderPRList() internally
 
       const [ws,we] = wkRange(currentTargetDate);
-      $('#weekInfo').textContent = `Week: ${ws} → ${we}`;
+      $('#weekInfo').textContent = `Week: ${formatDateForDisplay(ws)} → ${formatDateForDisplay(we)}`;
       
       const currentStreak = calculateStreak(state.entries);
       const streakEl = $('#streakBadge');
@@ -1227,6 +1301,8 @@
         container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
       } else {
         const config = EXERCISE_CONFIG[currentExercise];
+        if (!config) return; // Safety check
+        
         container.innerHTML = months.map(monthKey => {
           const monthDates = monthGroups[monthKey];
           const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
@@ -1257,7 +1333,7 @@
                     <div class="day-group">
                       <div class="day-header" tabindex="0" role="button" aria-expanded="false" aria-controls="sets-${date}" data-date="${date}">
                         <div>
-                          <strong>${date}</strong>
+                          <strong>${formatDateForDisplay(date)}</strong>
                           <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
                         </div>
                         <div>
@@ -1330,7 +1406,7 @@
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         const dateStr = d.toISOString().slice(0,10);
-        labels.push(dateStr);
+        labels.push(formatDateForDisplay(dateStr));
         const dayTotal = state.entries
           .filter(e => e.date === dateStr)
           .reduce((sum, e) => sum + e.reps, 0);
@@ -1381,7 +1457,11 @@
           },
           scales: {
             x: {
-              ticks: { color: '#9aa0a6', maxRotation: 45, minRotation: 45 },
+              ticks: { 
+                color: '#9aa0a6', 
+                maxRotation: 90, // Adjusted for dd-mm-yyyy
+                minRotation: 45 // Adjusted for dd-mm-yyyy
+              },
               grid: { color: '#222' }
             },
             y: {
@@ -1406,6 +1486,8 @@
       
       // [NEW] Get types from config
       const config = EXERCISE_CONFIG[currentExercise];
+      if (!config) return; // Safety check
+      
       const typeOptions = config.types
           .map(type => `<option value="${type}">${type}</option>`)
           .join('');
@@ -1514,7 +1596,9 @@
         $('#note').value = '';
         $('#reps').blur();
       }
-      if(e.target.classList.contains('month-header') || e.target.classList.contains('day-header')){
+      // Fix for delegation
+      const target = e.target;
+      if(target.classList.contains('month-header') || target.classList.contains('day-header')){
         if(e.key === 'Enter' || e.key === ' '){
           e.preventDefault();
           if(target.classList.contains('month-header')) toggleMonth(target.getAttribute('data-month'));
@@ -1528,7 +1612,8 @@
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       setLoading('addBtn', true, 'Adding...');
       
-      const date = $('#date').value || todayISO();
+      const displayDate = $('#date').value || todayDisplay();
+      const date = parseDateFromDisplay(displayDate); // Convert display date to ISO for storage
       const reps = Number($('#reps').value);
       if(!reps || reps < 1) {
           setLoading('addBtn', false, 'Add Set');
@@ -1540,26 +1625,31 @@
       
       // [NEW] Dynamic PR key lookup
       const config = EXERCISE_CONFIG[currentExercise];
+      if (!config) { // Safety check
+          setLoading('addBtn', false, 'Add Set');
+          return showError("Could not find configuration for this exercise.");
+      }
+      
       const prDef = config.prDefinitions[type]; // e.g., { key: 'pr_standard', label: '...'}
       const prKey = prDef ? prDef.key : null;    // e.g., 'pr_standard'
       
-      const oldStats = calculateAllStats(state.entries, state); 
-      const oldTodayTotal = oldStats.dailyTotals[date] || 0;
-      const oldHighestSet = oldStats.highestSet;
-      const oldHighestDailyTotal = oldStats.highestDailyTotal;
-      const oldHighestWeeklyTotal = oldStats.highestWeeklyTotal;
+      const oldStats = calculateAllStats(state.entries, state, date); // Use ISO date
+      const oldTodayTotal = (oldStats.dailyTotals && oldStats.dailyTotals[date]) || 0;
+      const oldHighestSet = oldStats.highestSet || 0;
+      const oldHighestDailyTotal = oldStats.highestDailyTotal || 0;
+      const oldHighestWeeklyTotal = oldStats.highestWeeklyTotal || 0;
       const oldTypePR = (prKey && state[prKey]) ? state[prKey].reps : 0; // Check old type PR
-      const oldTotal = oldStats.totalReps;
+      const oldTotal = oldStats.totalReps || 0;
       const oldStreak = calculateStreak(state.entries);
       
       const entry = { id: crypto.randomUUID(), date, reps, type, note, createdAt: Date.now() };
       const newState = { ...state, entries: [...state.entries, entry] };
       
-      const newStats = calculateAllStats(newState.entries, newState); 
+      const newStats = calculateAllStats(newState.entries, newState, date); // Use ISO date
       saveState(newState);
 
-      const newTodayTotal = newStats.dailyTotals[date];
-      const newTotal = newStats.totalReps;
+      const newTodayTotal = (newStats.dailyTotals && newStats.dailyTotals[date]) || 0;
+      const newTotal = newStats.totalReps || 0;
       const newStreak = calculateStreak(newState.entries);
 
       // --- Achievement Checks ---
@@ -1606,13 +1696,16 @@
 
     $('#clearTodayBtn').addEventListener('click', () => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      const d = $('#date').value || todayISO();
+      
+      const displayDate = $('#date').value || todayDisplay();
+      const d = parseDateFromDisplay(displayDate); // Use ISO date for logic
+      
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.innerHTML = `
         <div class="modal" role="dialog" aria-labelledby="clearModalTitle" aria-modal="true">
           <h3 id="clearModalTitle" style="color:var(--bad)">Confirm Clear</h3>
-          <p>Are you sure you want to delete all ${currentExercise} entries for ${d}?</p>
+          <p>Are you sure you want to delete all ${currentExercise} entries for ${displayDate}?</p>
           <div class="modal-buttons">
             <button class="ghost" id="cancelClear">Cancel</button>
             <button class="danger" id="confirmClear">Delete All</button>
@@ -1717,7 +1810,9 @@
       try {
           // Recalculate stats for *all* exercises before export
           for (const ex in globalState) {
-            calculateAllStats(globalState[ex].entries, globalState[ex]);
+            if (globalState[ex]) {
+                calculateAllStats(globalState[ex].entries, globalState[ex]);
+            }
           }
           const blob = new Blob([JSON.stringify(globalState,null,2)], {type:'application/json'});
           const a = document.createElement('a');
@@ -1747,6 +1842,9 @@
             const importedState = { ...createDefaultState('Push-up'), ...data };
             globalState['Push-up'] = importedState;
             calculateAllStats(importedState.entries, importedState);
+            // Ensure other exercises exist if importing an old file
+            if (!globalState['Ab Wheel']) globalState['Ab Wheel'] = createDefaultState('Ab Wheel');
+            if (!globalState['Squat']) globalState['Squat'] = createDefaultState('Squat');
             
         } else if (Object.keys(data).some(key => EXERCISE_CONFIG[key])) { // NEW multi-exercise file
             for (const exerciseName in EXERCISE_CONFIG) {
@@ -1754,7 +1852,9 @@
                     ...createDefaultState(exerciseName),
                     ...(data[exerciseName] || {})
                 };
-                calculateAllStats(globalState[exerciseName].entries, globalState[exerciseName]);
+                if (globalState[exerciseName]) {
+                    calculateAllStats(globalState[exerciseName].entries, globalState[exerciseName]);
+                }
             }
         } else {
              throw new Error('Unrecognized file structure. Not a valid tracker backup.');
@@ -1800,9 +1900,11 @@
       let totalSets = 0;
       let totalReps = 0;
       for (const ex in globalState) {
-        const stats = calculateAllStats(globalState[ex].entries, globalState[ex]);
-        totalSets += stats.totalSets;
-        totalReps += stats.totalReps;
+        if (globalState[ex]) {
+            const stats = calculateAllStats(globalState[ex].entries, globalState[ex]);
+            totalSets += stats.totalSets || 0;
+            totalReps += stats.totalReps || 0;
+        }
       }
 
       const overlay = document.createElement('div');
@@ -1877,8 +1979,10 @@
         dataModal.style.display = 'flex';
         renderLog(); 
         const stats = calculateAllStats(state.entries, state);
-        $('#totalSets').textContent = stats.totalSets;
-        $('#totalReps').textContent = stats.totalReps;
+        if (stats) {
+            $('#totalSets').textContent = stats.totalSets || 0;
+            $('#totalReps').textContent = stats.totalReps || 0;
+        }
         $('#raw').textContent = JSON.stringify(state,null,2); 
         $('#closeDataMenuBtn').focus();
     }
@@ -1896,7 +2000,7 @@
 
     // --- Init ---
     initApp();
-    $('#date').value = todayISO();
+    $('#date').value = todayDisplay();
 
   // --- HEADER ACTIONS WIRING ---
 (function(){
@@ -1910,10 +2014,14 @@
       modal.style.display = 'flex';
       try {
         const stats = calculateAllStats(state.entries, state);
-        document.getElementById('totalSets').textContent = stats.totalSets;
-        document.getElementById('totalReps').textContent = stats.totalReps;
+        if (stats) {
+            document.getElementById('totalSets').textContent = stats.totalSets || 0;
+            document.getElementById('totalReps').textContent = stats.totalReps || 0;
+        }
         document.getElementById('raw').textContent = JSON.stringify(state, null, 2);
-      } catch(e) {}
+      } catch(e) {
+          console.error("Error updating modal stats:", e);
+      }
     });
   }
   if (closeBtn && modal) {
@@ -1943,12 +2051,15 @@
 // --- Flatpickr custom date picker ---
 (function(){
   function initDatePicker(){
-    if (typeof flatpickr === 'undefined') return;
+    if (typeof flatpickr === 'undefined') {
+        console.warn("Flatpickr library not loaded.");
+        return;
+    }
     const el = document.getElementById('date');
     if (!el || el._fp) return;
     flatpickr(el, {
-      dateFormat: 'Y-m-d',
-      defaultDate: todayISO(),
+      dateFormat: 'd-m-Y',
+      defaultDate: todayDisplay(),
       allowInput: true,
       clickOpens: true,
       weekNumbers: true,
@@ -1960,8 +2071,12 @@
   } else {
     initDatePicker();
   }
-  const obs = new MutationObserver(initDatePicker);
-  obs.observe(document.body, { childList: true, subtree: true });
+  try {
+      const obs = new MutationObserver(initDatePicker);
+      obs.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {
+      console.error("MutationObserver init failed:", e);
+  }
 })();
 
 // --- Make calendar icon clickable, robust init ---
@@ -1978,8 +2093,8 @@
         }
         if (typeof flatpickr !== 'undefined') {
           const inst = flatpickr(input, {
-            dateFormat: 'Y-m-d',
-            defaultDate: todayISO(),
+            dateFormat: 'd-m-Y',
+            defaultDate: todayDisplay(),
             allowInput: true,
             clickOpens: true,
             weekNumbers: true,
@@ -1988,7 +2103,9 @@
           if (inst) inst.open();
           return;
         }
-      } catch(e){}
+      } catch(e){
+          console.error("Flatpickr open failed:", e);
+      }
       input.focus();
     }
     icon.addEventListener('click', openPicker);
