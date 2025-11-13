@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Push-up Tracker</title>
+  <!-- UPDATED TITLE -->
+  <title>Exercise Tracker</title>
   <style>
     :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     html,body{height:100%}
@@ -271,7 +272,9 @@
 <body>
   <header>
   <div style="display:flex;align-items:center;gap:16px">
-    <h1>Push-up Tracker</h1>
+    
+    <!-- UPDATED HEADER TITLE -->
+    <h1><span id="headerTitle">Push-up</span> Tracker</h1>
     <span class="pill" id="storageInfo">Local Storage</span>
     <div class="pill" id="weekInfo">Week: —</div>
     <div id="streakBadge"></div>
@@ -288,32 +291,38 @@
     
     <!-- LEFT COLUMN SECTIONS -->
     <section class="card" aria-labelledby="addEntryH" style="display:none" data-section id="addEntrySection">
-      <h2 id="addEntryH">Add Set</h2>
+      <!-- NEW EXERCISE SELECTOR -->
+      <div style="margin-bottom: 24px;">
+        <label for="exerciseSelect" style="font-size: 14px;">Exercise</label>
+        <select id="exerciseSelect" style="font-size: 16px;">
+          <option value="Push-up" selected>Push-up</option>
+          <option value="Ab Wheel">Ab Wheel</option>
+        </select>
+      </div>
+      <!-- END NEW SELECTOR -->
+      
+      <h2 id="addEntryH" style="margin-top: 16px;">Add Set</h2>
       <div>
         <div style="margin-bottom: 16px;">
           <label for="date">Date</label>
           <div style="position:relative;display:flex;align-items:center;">
-  <input id="date" type="text" class="date-picker" placeholder="Select date" style="width:100%;padding-right:40px;">
-  <span id="calendarIcon" role="button" aria-label="Open calendar" tabindex="0" style="position:absolute;right:12px;cursor:pointer;font-size:20px;color:var(--muted);">📅</span>
-</div>
+            <input id="date" type="text" class="date-picker" placeholder="Select date" style="width:100%;padding-right:40px;">
+            <span id="calendarIcon" role="button" aria-label="Open calendar" tabindex="0" style="position:absolute;right:12px;cursor:pointer;font-size:20px;color:var(--muted);">📅</span>
+          </div>
         </div>
         <div style="margin-bottom: 16px;">
           <label for="reps">Reps</label>
           <input id="reps" type="number" min="1" inputmode="numeric" placeholder="e.g. 20" />
         </div>
         
-        <!-- NEW DROPDOWN MENU ADDED HERE -->
+        <!-- DYNAMIC DROPDOWN MENU -->
         <div style="margin-bottom: 16px;">
           <label for="type">Type</label>
-          <select id="type" aria-label="Push-up Type">
-            <option value="Standard" selected>Standard</option>
-            <option value="Wide">Wide</option>
-            <option value="Narrow">Narrow</option>
-            <option value="Inside">Inside</option>
-            <option value="Other">Other</option>
+          <select id="type" aria-label="Set Type">
+            <!-- Options will be populated by JavaScript -->
           </select>
         </div>
-        <!-- END NEW DROPDOWN MENU -->
+        <!-- END DYNAMIC DROPDOWN MENU -->
 
         <div style="margin-bottom: 16px;">
           <label for="note">Notes</label>
@@ -323,7 +332,6 @@
       <div class="row" style="margin-top:10px">
         <button class="primary" id="addBtn">Add Set</button>
         <button id="clearTodayBtn" class="ghost">Clear Today</button>
-        <span class="pill" id="todayTotal">Today: 0</span>
       </div>
     </section>
     
@@ -362,7 +370,8 @@
             <div class="spacer"></div>
 
             <!-- Max Standard Set -->
-            <div class="pr-item">
+            <!-- ADDED data-exercise-pr -->
+            <div class="pr-item" data-exercise-pr="Push-up">
               <span class="pr-label">Max Standard Set</span>
               <div class="pr-value" id="highestStandardSet">
                 <span id="highestStandardSetReps">0</span>
@@ -371,7 +380,8 @@
             </div>
 
             <!-- Max Wide Set -->
-            <div class="pr-item">
+            <!-- ADDED data-exercise-pr -->
+            <div class="pr-item" data-exercise-pr="Push-up">
               <span class="pr-label">Max Wide Set</span>
               <div class="pr-value" id="highestWideSet">
                 <span id="highestWideSetReps">0</span>
@@ -380,7 +390,8 @@
             </div>
 
             <!-- Max Narrow Set -->
-            <div class="pr-item">
+            <!-- ADDED data-exercise-pr -->
+            <div class="pr-item" data-exercise-pr="Push-up">
               <span class="pr-label">Max Narrow Set</span>
               <div class="pr-value" id="highestNarrowSet">
                 <span id="highestNarrowSetReps">0</span>
@@ -389,13 +400,24 @@
             </div>
 
             <!-- Max Inside Set -->
-            <div class="pr-item">
+            <!-- ADDED data-exercise-pr -->
+            <div class="pr-item" data-exercise-pr="Push-up">
               <span class="pr-label">Max Inside Set</span>
               <div class="pr-value" id="highestInsideSet">
                 <span id="highestInsideSetReps">0</span>
                 <span class="pr-date" id="highestInsideSetDate">—</span>
               </div>
             </div>
+            
+            <!-- NEW: Ab Wheel Specific PR -->
+            <div class="pr-item" data-exercise-pr="Ab Wheel" style="display: none;">
+              <span class="pr-label">Max Ab Wheel Set</span>
+              <div class="pr-value" id="highestAbwheelSet">
+                <span id="highestAbwheelSetReps">0</span>
+                <span class="pr-date" id="highestAbwheelSetDate">—</span>
+              </div>
+            </div>
+            <!-- END NEW PR -->
         </div>
         <!-- END UPDATED PR LAYOUT -->
     </section>
@@ -582,7 +604,7 @@
     
     // --- CONSTANTS AND CONFIGURATION (Magic Numbers fix) ---
     const CONSTANTS = {
-        STORAGE_KEY: 'pushup_tracker_data',
+        STORAGE_KEY: 'pushup_tracker_data', // This key will now store the globalState object
         LAST_BACKUP_KEY: 'pushup_tracker_last_backup_date',
         // EmailJS Config (USER'S CREDENTIALS)
         // NOTE: Please ensure these keys are correct for your EmailJS account.
@@ -614,20 +636,41 @@
         emailjs.init({ publicKey: CONSTANTS.EMAILJS_PUBLIC_KEY });
     }
 
-    // UPDATED STATE STRUCTURE: ADDED PRs FOR SPECIFIC TYPES
-    let state = { 
+    // --- NEW MULTI-EXERCISE STATE STRUCTURE ---
+    const defaultPR = { reps: 0, date: '—' };
+
+    const defaultPushupState = {
         entries: [], 
         target: 30, 
         lastStreak: 0, 
-        // New PR structure to store reps and date
-        pr_set: { reps: 0, date: '—' },
-        pr_day: { reps: 0, date: '—' },
-        pr_week: { reps: 0, date: '—' },
-        pr_standard: { reps: 0, date: '—' },
-        pr_wide: { reps: 0, date: '—' },
-        pr_narrow: { reps: 0, date: '—' },
-        pr_inside: { reps: 0, date: '—' },
+        pr_set: { ...defaultPR },
+        pr_day: { ...defaultPR },
+        pr_week: { ...defaultPR },
+        pr_standard: { ...defaultPR },
+        pr_wide: { ...defaultPR },
+        pr_narrow: { ...defaultPR },
+        pr_inside: { ...defaultPR },
     };
+    
+    const defaultAbWheelState = {
+        entries: [], 
+        target: 20, // Different default target
+        lastStreak: 0, 
+        pr_set: { ...defaultPR },
+        pr_day: { ...defaultPR },
+        pr_week: { ...defaultPR },
+        pr_abwheel: { ...defaultPR }, // Specific PR
+    };
+
+    let globalState = {
+        'Push-up': { ...defaultPushupState },
+        'Ab Wheel': { ...defaultAbWheelState }
+    };
+    
+    let currentExercise = 'Push-up';
+    let state = globalState[currentExercise]; // 'state' now points to the active exercise's state
+    // --- END NEW STATE STRUCTURE ---
+    
     let isStorageReady = false; 
     let chartInstance = null;
     let renderDebounceTimer = null;
@@ -720,55 +763,53 @@
         $('#storageInfo').textContent = 'Local Storage (This Device)';
     }
 
-    // --- STORAGE FUNCTIONS ---
-    
-    // Default structure for PRs
-    const defaultPR = { reps: 0, date: '—' };
+    // --- STORAGE FUNCTIONS (REFACTORED FOR MULTI-EXERCISE) ---
     
     function loadState() {
       try {
         const localData = localStorage.getItem(CONSTANTS.STORAGE_KEY);
         if (localData) {
-          const loadedState = JSON.parse(localData);
-          state = {
-            entries: loadedState.entries || [],
-            target: loadedState.target || 30,
-            lastStreak: loadedState.lastStreak || 0,
-            // Initialize new PR fields from loaded data or defaults
-            pr_set: loadedState.pr_set || defaultPR,
-            pr_day: loadedState.pr_day || defaultPR,
-            pr_week: loadedState.pr_week || defaultPR,
-            pr_standard: loadedState.pr_standard || defaultPR,
-            pr_wide: loadedState.pr_wide || defaultPR,
-            pr_narrow: loadedState.pr_narrow || defaultPR,
-            pr_inside: loadedState.pr_inside || defaultPR,
-          };
+          const loaded = JSON.parse(localData);
+          
+          if (loaded.entries) { // OLD structure detected (data is the old 'state' object)
+            console.log("Old data structure detected. Migrating...");
+            // Create a clean new state object
+            const migratedState = {
+                'Push-up': { ...defaultPushupState, ...loaded }, // Spread loaded data over defaults
+                'Ab Wheel': { ...defaultAbWheelState }
+            };
+            
+            // Recalculate PRs for the loaded pushup data to populate all fields
+            // Note: calculateAllStats will mutate the 'Push-up' object directly
+            calculateAllStats(migratedState['Push-up'].entries, migratedState['Push-up']); 
+            
+            globalState = migratedState;
+            console.log("Migration complete.");
+
+          } else { // NEW structure (data is the 'globalState' object)
+            console.log("Loading new data structure.");
+            // Merge loaded state with defaults to ensure all keys exist (e.g., if Ab Wheel was added later)
+            globalState['Push-up'] = { ...defaultPushupState, ...(loaded['Push-up'] || {}) };
+            globalState['Ab Wheel'] = { ...defaultAbWheelState, ...(loaded['Ab Wheel'] || {}) };
+          }
         } else {
-          // New state initializes with all defaults
-          state = { 
-            entries: [], 
-            target: 30, 
-            lastStreak: 0,
-            pr_set: defaultPR,
-            pr_day: defaultPR,
-            pr_week: defaultPR,
-            pr_standard: defaultPR,
-            pr_wide: defaultPR,
-            pr_narrow: defaultPR,
-            pr_inside: defaultPR,
-          };
+          // No data, globalState already has defaults
         }
+        
+        // Set the active state variable
+        state = globalState[currentExercise]; 
       } catch (error) {
         console.error('Error loading state from localStorage:', error);
-        state = { entries: [], target: 30, lastStreak: 0 };
+        // state is already set to default globalState[currentExercise]
         showError('Could not load data from local storage. Your data may be corrupted.');
       }
     }
 
     function saveState(newState) {
-      state = newState;
+      state = newState; // Update the in-memory 'current' state
+      globalState[currentExercise] = newState; // Update the global state object
       try {
-        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(newState));
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
         scheduleRender();
       } catch (error) {
         console.error('Error saving to localStorage:', error);
@@ -776,7 +817,7 @@
       }
     }
     
-    // --- CALCULATION LOGIC (State Mutation and Redundant Recalculations fix) ---
+    // --- CALCULATION LOGIC (REFACTORED FOR MULTI-EXERCISE) ---
 
     // Calculate streak (accepts entries as parameter)
     function calculateStreak(entries) {
@@ -812,8 +853,13 @@
       return streak;
     }
 
-    // Combined stats calculation (calculateAllStats function)
-    function calculateAllStats(entries, currentTargetDate = todayISO()) {
+    /**
+     * Calculates all stats for a given set of entries and mutates the provided state object with new PRs.
+     * @param {Array} entries - The list of entry objects for the current exercise.
+     * @param {Object} currentExerciseState - The state object for the current exercise (e.g., globalState['Push-up']).
+     * @param {string} currentTargetDate - The ISO date string for the "current day".
+     */
+    function calculateAllStats(entries, currentExerciseState, currentTargetDate = todayISO()) {
         const stats = {
             totalReps: 0,
             totalSets: entries.length,
@@ -821,14 +867,15 @@
             highestSet: 0,
             highestDailyTotal: 0,
             highestWeeklyTotal: 0,
-            // Detailed PRs (reps and date)
-            pr_set: { reps: 0, date: '—' },
-            pr_day: { reps: 0, date: '—' },
-            pr_week: { reps: 0, date: '—' },
-            pr_standard: { reps: 0, date: '—' },
-            pr_wide: { reps: 0, date: '—' },
-            pr_narrow: { reps: 0, date: '—' },
-            pr_inside: { reps: 0, date: '—' },
+            // Detailed PRs (reps and date) - Initialized from the passed state object
+            pr_set: currentExerciseState.pr_set,
+            pr_day: currentExerciseState.pr_day,
+            pr_week: currentExerciseState.pr_week,
+            pr_standard: currentExerciseState.pr_standard || defaultPR,
+            pr_wide: currentExerciseState.pr_wide || defaultPR,
+            pr_narrow: currentExerciseState.pr_narrow || defaultPR,
+            pr_inside: currentExerciseState.pr_inside || defaultPR,
+            pr_abwheel: currentExerciseState.pr_abwheel || defaultPR, // Added Ab Wheel PR
             // Totals
             dailyTotals: {},
             weeklyTotals: {},
@@ -839,16 +886,6 @@
             avgSet: 0,
             currentSetsToday: 0
         };
-        
-        // Initialize detailed PRs from state for comparison
-        stats.pr_set = state.pr_set;
-        stats.pr_day = state.pr_day;
-        stats.pr_week = state.pr_week;
-        stats.pr_standard = state.pr_standard;
-        stats.pr_wide = state.pr_wide;
-        stats.pr_narrow = state.pr_narrow;
-        stats.pr_inside = state.pr_inside;
-
 
         const todayStr = todayISO(); // String representation of today
         const todayDate = new Date(todayStr); // Date object for calculations
@@ -860,11 +897,10 @@
         let maxWeeklyReps = stats.pr_week.reps;
         let maxWeeklyWeekStart = stats.pr_week.reps > 0 ? wkRange(stats.pr_week.date)[0] : null;
 
-
         // Single pass through all entries
         for (const entry of entries) {
             // Ensure type is defaulted if missing
-            entry.type = entry.type || 'Standard';
+            entry.type = entry.type || (currentExercise === 'Push-up' ? 'Standard' : 'Ab Wheel');
 
             stats.totalReps += entry.reps;
             
@@ -887,6 +923,10 @@
                     break;
                 case 'Inside':
                     if (entry.reps > stats.pr_inside.reps) stats.pr_inside = { reps: entry.reps, date: entry.date };
+                    break;
+                // NEW: Handle Ab Wheel
+                case 'Ab Wheel':
+                    if (entry.reps > stats.pr_abwheel.reps) stats.pr_abwheel = { reps: entry.reps, date: entry.date };
                     break;
                 // 'Other' is not tracked as a specific PR type
             }
@@ -911,7 +951,6 @@
             stats.pr_day = { reps: maxDailyReps, date: maxDailyDate };
         }
         stats.highestDailyTotal = stats.pr_day.reps; // Keep simple version for achievement check
-
 
         // Calculate Weekly PR
         for(const weekStart in stats.weeklyTotals) {
@@ -944,14 +983,15 @@
         const [lastWeekStart] = wkRange(lastWeekDate.toISOString().slice(0,10));
         stats.lastWeekTotal = stats.weeklyTotals[lastWeekStart] || 0;
         
-        // Store the new detailed PRs back into the state object for persistence
-        state.pr_set = stats.pr_set;
-        state.pr_day = stats.pr_day;
-        state.pr_week = stats.pr_week;
-        state.pr_standard = stats.pr_standard;
-        state.pr_wide = stats.pr_wide;
-        state.pr_narrow = stats.pr_narrow;
-        state.pr_inside = stats.pr_inside;
+        // Store the new detailed PRs back into the *passed state object* for persistence
+        currentExerciseState.pr_set = stats.pr_set;
+        currentExerciseState.pr_day = stats.pr_day;
+        currentExerciseState.pr_week = stats.pr_week;
+        currentExerciseState.pr_standard = stats.pr_standard;
+        currentExerciseState.pr_wide = stats.pr_wide;
+        currentExerciseState.pr_narrow = stats.pr_narrow;
+        currentExerciseState.pr_inside = stats.pr_inside;
+        currentExerciseState.pr_abwheel = stats.pr_abwheel; // Save Ab Wheel PR
 
         return stats;
     }
@@ -965,21 +1005,23 @@
           return { status: 400, text: 'Skipped - Not Configured' };
       }
       
-      const stats = calculateAllStats(state.entries);
+      // Calculate stats for the *current* exercise to include in the subject
+      const stats = calculateAllStats(state.entries, state);
       const exportDate = new Date().toLocaleString();
       
+      // BACKUP THE ENTIRE globalState OBJECT
       const fullStateForBackup = { 
-        ...state, 
-        totalSets: stats.totalSets, 
-        totalReps: stats.totalReps, 
+        ...globalState, 
         exportDate: new Date().toISOString() 
       };
 
       const templateParams = {
-          subject: `Push-up Tracker Backup - ${new Date().toLocaleDateString()}`,
+          // Subject reflects the currently viewed exercise
+          subject: `${currentExercise} Tracker Backup - ${new Date().toLocaleDateString()}`,
           totalReps: stats.totalReps,
           totalSets: stats.totalSets,
           backupTime: exportDate,
+          // The backup data is the *entire* JSON of all exercises
           backupData: JSON.stringify(fullStateForBackup, null, 2),
       };
 
@@ -1031,15 +1073,22 @@
 
     function initApp() {
       try {
-        loadState();
+        loadState(); // Loads into globalState and sets 'state' variable
         isStorageReady = true;
+        
+        // Sync UI to the loaded state
+        $('#exerciseSelect').value = currentExercise;
+        updateTypeDropdown(currentExercise);
         
         // Recalculate all stats on load to ensure old entries are correctly factored into new PR structure
         // This is crucial for users upgrading from the old data structure
-        calculateAllStats(state.entries);
-        saveState(state); // Persist new PR structure (pr_set, pr_day, etc.)
+        // This will mutate 'state' (which points to globalState[currentExercise])
+        calculateAllStats(state.entries, state);
         
-        scheduleRender();
+        // Save the potentially migrated/recalculated state
+        saveState(state); 
+        
+        scheduleRender(); // This will call render()
         toggleContent(true);
         
         scheduleDailyBackupCheck();
@@ -1084,7 +1133,7 @@
       } else if(type === 'milestone'){
         emoji = '🏆';
         title = `${value} Total Reps!`;
-        message = `Incredible milestone! You've completed ${value} push-ups!`;
+        message = `Incredible milestone! You've completed ${value} ${currentExercise.toLowerCase()} reps!`;
       } else if(type === 'pr'){
         emoji = '💪';
         title = 'New Personal Record!';
@@ -1099,6 +1148,7 @@
         message = `${value} reps this week! Your highest weekly total yet!`;
       } else if(type === 'type_pr'){
         emoji = '✨';
+        // Updated to be more generic
         title = `New ${detail} Set Record!`;
         message = `${value} reps for your ${detail} sets! Incredible work.`;
       }
@@ -1143,7 +1193,7 @@
       const weeklyPRDate = stats.pr_week.date !== '—' ? wkRange(stats.pr_week.date).join(' → ') : '—';
       $('#highestWeeklyTotalDate').textContent = weeklyPRDate;
 
-      // Type-Specific PRs
+      // Type-Specific PRs (Push-up)
       $('#highestStandardSetReps').textContent = stats.pr_standard.reps;
       $('#highestStandardSetDate').textContent = stats.pr_standard.date;
       
@@ -1156,6 +1206,15 @@
       $('#highestInsideSetReps').textContent = stats.pr_inside.reps;
       $('#highestInsideSetDate').textContent = stats.pr_inside.date;
       
+      // Type-Specific PRs (Ab Wheel)
+      $('#highestAbwheelSetReps').textContent = stats.pr_abwheel.reps;
+      $('#highestAbwheelSetDate').textContent = stats.pr_abwheel.date;
+      
+      // NEW: Show/Hide exercise-specific PRs
+      document.querySelectorAll('[data-exercise-pr]').forEach(el => {
+        el.style.display = (el.dataset.exercisePr === currentExercise) ? 'flex' : 'none';
+      });
+
       // Other Metrics
       $('#avgSet').textContent = stats.avgSet;
       $('#setsToday').textContent = stats.currentSetsToday;
@@ -1176,7 +1235,8 @@
       if (dataModal && dataModal.style.display === 'flex') {
           $('#totalSets').textContent = stats.totalSets;
           $('#totalReps').textContent = stats.totalReps;
-          $('#raw').textContent = JSON.stringify(state,null,2);
+          // Show raw JSON for *current* exercise
+          $('#raw').textContent = JSON.stringify(state,null,2); 
       }
     }
     
@@ -1207,13 +1267,39 @@
         comparison.innerHTML = `<span class="trend stable">Same as last week</span> <span style="color:var(--muted);margin-left:8px">Stay consistent!</span>`;
       }
     }
+    
+    // NEW: Function to update the "Type" dropdown based on selected exercise
+    function updateTypeDropdown(exercise) {
+        const typeSelect = $('#type');
+        if (!typeSelect) return;
+        
+        if (exercise === 'Push-up') {
+            typeSelect.innerHTML = `
+                <option value="Standard" selected>Standard</option>
+                <option value="Wide">Wide</option>
+                <option value="Narrow">Narrow</option>
+                <option value="Inside">Inside</option>
+                <option value="Other">Other</option>
+            `;
+        } else if (exercise === 'Ab Wheel') {
+            typeSelect.innerHTML = `
+                <option value="Ab Wheel" selected>Ab Wheel</option>
+            `;
+        }
+        // Add more exercises here with 'else if'
+    }
 
     function render(){
+      // 'state' variable is now correctly pointing to the current exercise's state object
       $('#date').value ||= todayISO();
       $('#dailyTarget').value = state.target;
+      
+      // Update header title
+      $('#headerTitle').textContent = currentExercise;
 
       const currentTargetDate = $('#date').value || todayISO();
-      const stats = calculateAllStats(state.entries, currentTargetDate);
+      // Pass 'state' (the current exercise's state) to be mutated with new PRs
+      const stats = calculateAllStats(state.entries, state, currentTargetDate);
 
       const stateStr = JSON.stringify(state.entries); 
       const needsFullRender = stateStr !== lastRenderedState;
@@ -1315,7 +1401,7 @@
                             <div class="set-info">
                               <strong>${e.reps} reps</strong>
                               <!-- Display the type next to reps -->
-                              <span style="color:var(--accent);margin-left:8px">${escapeHtml(e.type || 'Standard')}</span>
+                              <span style="color:var(--accent);margin-left:8px">${escapeHtml(e.type || (currentExercise === 'Push-up' ? 'Standard' : 'Ab Wheel'))}</span>
                               ${e.note ? `<span style="color:var(--muted);margin-left:8px">${escapeHtml(e.note)}</span>` : ''}
                             </div>
                             <div class="set-actions">
@@ -1379,6 +1465,7 @@
         const dateStr = d.toISOString().slice(0,10);
         labels.push(dateStr);
         
+        // Read from 'state' (which is the current exercise's state)
         const dayTotal = state.entries
           .filter(e => e.date === dateStr)
           .reduce((sum, e) => sum + e.reps, 0);
@@ -1397,7 +1484,7 @@
           labels: labels,
           datasets: [
             {
-              label: 'Daily Push-ups',
+              label: `Daily ${currentExercise} Reps`, // Dynamic label
               data: data,
               borderColor: '#4f8cff',
               backgroundColor: 'rgba(79, 140, 255, 0.1)',
@@ -1408,7 +1495,7 @@
             },
             {
               label: 'Target',
-              data: Array(labels.length).fill(state.target),
+              data: Array(labels.length).fill(state.target), // Uses current exercise's target
               borderColor: '#22c55e',
               borderDash: [5, 5],
               borderWidth: 2,
@@ -1466,16 +1553,12 @@
           <label>Reps</label>
           <input type="number" id="editReps" value="${entry.reps}" min="1" aria-label="Number of reps" />
           
-          <!-- Add type dropdown for editing -->
+          <!-- DYNAMIC type dropdown for editing -->
           <label>Type</label>
-          <select id="editType" aria-label="Push-up Type" style="margin-bottom:16px">
-            <option value="Standard">Standard</option>
-            <option value="Wide">Wide</option>
-            <option value="Narrow">Narrow</option>
-            <option value="Inside">Inside</option>
-            <option value="Other">Other</option>
+          <select id="editType" aria-label="Set Type" style="margin-bottom:16px">
+            <!-- Options populated by JS -->
           </select>
-          <!-- END NEW TYPE DROPDOWN -->
+          <!-- END DYNAMIC TYPE DROPDOWN -->
 
           <label>Notes</label>
           <textarea id="editNote" aria-label="Set notes">${entry.note || ''}</textarea>
@@ -1496,8 +1579,21 @@
       repsInput.focus();
       repsInput.select();
       
+      // --- NEW: Dynamically populate edit dropdown ---
+      if (currentExercise === 'Push-up') {
+        typeSelect.innerHTML = `
+            <option value="Standard">Standard</option>
+            <option value="Wide">Wide</option>
+            <option value="Narrow">Narrow</option>
+            <option value="Inside">Inside</option>
+            <option value="Other">Other</option>
+        `;
+      } else if (currentExercise === 'Ab Wheel') {
+         typeSelect.innerHTML = `<option value="Ab Wheel">Ab Wheel</option>`;
+      }
       // Set the current type value
-      if(typeSelect) typeSelect.value = entry.type || 'Standard'; 
+      typeSelect.value = entry.type || (currentExercise === 'Push-up' ? 'Standard' : 'Ab Wheel'); 
+      // --- END NEW ---
 
       const handleSave = () => {
         setLoading('saveEdit', true, 'Saving...');
@@ -1521,7 +1617,8 @@
                 entryToUpdate.note = note;
             }
             // Recalculate all stats and PRs after edit, then save the full state
-            calculateAllStats(newState.entries);
+            // Pass newState so calculateAllStats mutates it before saving
+            calculateAllStats(newState.entries, newState); 
             saveState(newState);
             overlay.remove();
             showSuccess('Set updated successfully.');
@@ -1549,6 +1646,17 @@
     }
 
     // --- EVENTS AND HANDLERS ---
+    
+    // NEW: Exercise selector change handler
+    $('#exerciseSelect').addEventListener('change', (e) => {
+        currentExercise = e.target.value;
+        state = globalState[currentExercise]; // CRITICAL: Update the global 'state' variable
+        
+        console.log(`Switched to ${currentExercise}`, state);
+        
+        updateTypeDropdown(currentExercise); // Update the 'Type' dropdown
+        scheduleRender(); // Full re-render for the new exercise
+    });
     
     document.addEventListener('keydown', (e) => {
       if((e.ctrlKey || e.metaKey) && e.key === 'k'){
@@ -1589,12 +1697,21 @@
       }
       
       const type = $('#type').value; // Get the selected type
-      const typeKey = `pr_${type.toLowerCase()}`;
+      
+      // NEW: Logic to get the correct PR key
+      let typeKey;
+      if (type === 'Ab Wheel') {
+          typeKey = 'pr_abwheel';
+      } else {
+          typeKey = `pr_${type.toLowerCase()}`;
+      }
+      
       // Apply XSS escape to notes
       const note = escapeHtml($('#note').value.trim());
       
       // Get Old Stats BEFORE adding new entry (Achievement Detection Timing Bug fix)
-      const oldStats = calculateAllStats(state.entries);
+      // Pass 'state' to be read from
+      const oldStats = calculateAllStats(state.entries, state); 
       const oldTodayTotal = oldStats.dailyTotals[date] || 0;
       const oldHighestSet = oldStats.highestSet;
       const oldHighestDailyTotal = oldStats.highestDailyTotal;
@@ -1604,11 +1721,13 @@
       const oldStreak = calculateStreak(state.entries); // Pass entries to fixed function
       
       const entry = { id: crypto.randomUUID(), date, reps, type, note, createdAt: Date.now() };
+      // Create newState based on current 'state'
       const newState = { ...state, entries: [...state.entries, entry] };
       
-      // Calculate New Stats AFTER adding entry (updates state.pr_xxx properties internally)
-      const newStats = calculateAllStats(newState.entries);
-      saveState(newState); // Save the updated state including new PRs
+      // Calculate New Stats AFTER adding entry
+      // Pass 'newState' to be mutated with new PRs
+      const newStats = calculateAllStats(newState.entries, newState); 
+      saveState(newState); // Save the updated newState
 
       const newTodayTotal = newStats.dailyTotals[date];
       const newTotal = newStats.totalReps;
@@ -1628,7 +1747,7 @@
       }
 
       // New personal record (Type-specific Set)
-      if(reps > oldTypePR && type !== 'Other'){
+      if(typeKey !== 'pr_other' && state[typeKey] && reps > oldTypePR){
         showAchievement('type_pr', reps, type);
       }
       
@@ -1690,7 +1809,7 @@
           overlay.innerHTML = `
             <div class="modal" role="dialog" aria-labelledby="clearModalTitle" aria-modal="true">
               <h3 id="clearModalTitle" style="color:var(--bad)">Confirm Clear</h3>
-              <p>Are you sure you want to delete all entries for ${d}?</p>
+              <p>Are you sure you want to delete all ${currentExercise} entries for ${d}?</p>
               <div class="modal-buttons">
                 <button class="ghost" id="cancelClear">Cancel</button>
                 <button class="danger" id="confirmClear">Delete All</button>
@@ -1707,7 +1826,8 @@
                   entries: state.entries.filter(e => e.date !== d) 
                 };
                 // Recalculate all stats and PRs after clearing data
-                calculateAllStats(newState.entries);
+                // Pass newState to be mutated
+                calculateAllStats(newState.entries, newState);
                 saveState(newState); 
                 overlay.remove();
                 showSuccess(`All sets for ${d} deleted.`);
@@ -1796,7 +1916,8 @@
                   entries: state.entries.filter(x => x.id !== entryIdToDelete) 
                 };
                 // Recalculate all stats and PRs after deleting
-                calculateAllStats(newState.entries);
+                // Pass newState to be mutated
+                calculateAllStats(newState.entries, newState);
                 saveState(newState); 
                 overlay.remove();
                 showSuccess('Set deleted successfully.');
@@ -1839,17 +1960,16 @@
     document.getElementById('dataModal').querySelector('#exportBtn').addEventListener('click', () => {
       try {
           // Export includes current calculated PRs for robust backup
-          const stats = calculateAllStats(state.entries);
-          const exportState = {
-              ...state,
-              highestSet: stats.highestSet,
-              highestDailyTotal: stats.highestDailyTotal,
-              highestWeeklyTotal: stats.highestWeeklyTotal,
-          };
-          const blob = new Blob([JSON.stringify(exportState,null,2)], {type:'application/json'});
+          // We'll export the *entire* globalState
+          
+          // Recalculate stats for *all* exercises before export to ensure PRs are up-to-date
+          calculateAllStats(globalState['Push-up'].entries, globalState['Push-up']);
+          calculateAllStats(globalState['Ab Wheel'].entries, globalState['Ab Wheel']);
+          
+          const blob = new Blob([JSON.stringify(globalState,null,2)], {type:'application/json'});
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = 'pushup-tracker-backup.json';
+          a.download = 'exercise-tracker-backup.json'; // Updated filename
           a.click();
           URL.revokeObjectURL(a.href);
       } catch (e) {
@@ -1871,32 +1991,37 @@
         const text = await f.text();
         const data = JSON.parse(text);
         
-        if(!data || typeof data !== 'object' || !Array.isArray(data.entries)){
-          throw new Error('Invalid file format or missing entries array.');
+        if(!data || typeof data !== 'object'){
+          throw new Error('Invalid file format.');
+        }
+
+        if (data.entries) { // OLD single-exercise file
+            // Import into the 'Push-up' slot
+            const importedState = { ...defaultPushupState, ...data };
+            globalState['Push-up'] = importedState;
+            // Recalculate PRs for the imported data
+            calculateAllStats(importedState.entries, importedState);
+            // Don't touch the Ab Wheel state
+            
+        } else if (data['Push-up'] || data['Ab Wheel']) { // NEW multi-exercise file
+            // Merge loaded state with defaults
+            globalState['Push-up'] = { ...defaultPushupState, ...(data['Push-up'] || {}) };
+            globalState['Ab Wheel'] = { ...defaultAbWheelState, ...(data['Ab Wheel'] || {}) };
+            
+            // Recalculate PRs for all imported data
+            calculateAllStats(globalState['Push-up'].entries, globalState['Push-up']);
+            calculateAllStats(globalState['Ab Wheel'].entries, globalState['Ab Wheel']);
+        } else {
+             throw new Error('Unrecognized file structure. Not a valid tracker backup.');
         }
         
-        // Use imported target/streak/PRs, ensure defaults are set for new PR fields if old data is imported
-        const newState = { 
-          entries: data.entries, 
-          target: Number(data.target) || 30,
-          lastStreak: Number(data.lastStreak) || 0,
-          
-          pr_set: data.pr_set || defaultPR,
-          pr_day: data.pr_day || defaultPR,
-          pr_week: data.pr_week || defaultPR,
-          pr_standard: data.pr_standard || defaultPR,
-          pr_wide: data.pr_wide || defaultPR,
-          pr_narrow: data.pr_narrow || defaultPR,
-          pr_inside: data.pr_inside || defaultPR,
-          
-          // Legacy support (migrate old fields if new ones are missing)
-          // The full recalculation below handles this more robustly, but these lines ensure the object structure is clean for saving.
-        };
-
-        // Recalculate PRs on import to correctly populate all fields, especially for old data formats
-        calculateAllStats(newState.entries);
+        // After import, set the current 'state' variable to the active exercise
+        state = globalState[currentExercise];
         
-        saveState(newState); 
+        // Save the entire updated globalState
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
+        scheduleRender(); // Re-render with new data
+        
         fileInput.value = ''; // Clear file input
         showSuccess('Data imported and saved to local storage. Stats recalculated.');
         
@@ -1917,7 +2042,7 @@
       try {
           const response = await sendBackupEmail();
           if (response.status === 200) {
-              showSuccess('Your push-up data has been successfully emailed.');
+              showSuccess(`Your ${currentExercise} data (and all other exercises) has been successfully emailed.`);
           } else if (response.status === 400 && response.text === 'Skipped - Not Configured') {
               // Warning already shown inside sendBackupEmail
           } else {
@@ -1934,8 +2059,11 @@
     document.getElementById('dataModal').querySelector('#resetBtn').addEventListener('click', () => {
       if(!isStorageReady) return showWarning("App is not ready. Please try again.");
       
-      const stats = calculateAllStats(state.entries);
-      const totalReps = stats.totalReps;
+      // Get totals for *all* exercises
+      const pushupStats = calculateAllStats(globalState['Push-up'].entries, globalState['Push-up']);
+      const abwheelStats = calculateAllStats(globalState['Ab Wheel'].entries, globalState['Ab Wheel']);
+      const totalSets = pushupStats.totalSets + abwheelStats.totalSets;
+      const totalReps = pushupStats.totalReps + abwheelStats.totalReps;
 
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -1945,7 +2073,7 @@
           <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
           <div class="warning-banner">
             <div>
-              <strong>Warning:</strong> This will permanently delete all your push-up data (${state.entries.length} sets, ${totalReps} reps) from local storage.
+              <strong>Warning:</strong> This will permanently delete data for ALL exercises (${totalSets} sets, ${totalReps} reps total) from local storage.
             </div>
           </div>
           <p style="color:var(--muted);margin:16px 0">This action cannot be undone. We recommend exporting your data first.</p>
@@ -1980,19 +2108,16 @@
         setLoading('confirmResetBtn', true, 'Deleting...');
         try {
             // Reset to clean state, including all new PR fields
-            const newState = { 
-                entries: [], 
-                target: 30, 
-                lastStreak: 0,
-                pr_set: defaultPR,
-                pr_day: defaultPR,
-                pr_week: defaultPR,
-                pr_standard: defaultPR,
-                pr_wide: defaultPR,
-                pr_narrow: defaultPR,
-                pr_inside: defaultPR,
+            globalState = {
+                'Push-up': { ...defaultPushupState },
+                'Ab Wheel': { ...defaultAbWheelState }
             };
-            saveState(newState); 
+            // Set current 'state' to the default
+            state = globalState[currentExercise];
+            
+            // Save the empty globalState
+            localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
+            scheduleRender();
             
             overlay.remove();
             showSuccess('All data has been deleted from local storage.');
@@ -2021,10 +2146,12 @@
         dataModal.style.display = 'flex';
         
         // Ensure log history is rendered and stats are updated when opening
+        // These stats are for the *current* exercise
         renderLog(); 
-        const stats = calculateAllStats(state.entries);
+        const stats = calculateAllStats(state.entries, state);
         $('#totalSets').textContent = stats.totalSets;
         $('#totalReps').textContent = stats.totalReps;
+        // Raw JSON shows *current* exercise state
         $('#raw').textContent = JSON.stringify(state,null,2); 
         
         // Focus the close button for accessibility
@@ -2068,9 +2195,9 @@
   if (openBtn && modal) {
     openBtn.addEventListener('click', () => {
       modal.style.display = 'flex';
-      // Refresh totals and raw JSON when opening
+      // Refresh totals and raw JSON when opening (for current exercise)
       try {
-        const stats = calculateAllStats(state.entries);
+        const stats = calculateAllStats(state.entries, state);
         document.getElementById('totalSets').textContent = stats.totalSets;
         document.getElementById('totalReps').textContent = stats.totalReps;
         document.getElementById('raw').textContent = JSON.stringify(state, null, 2);
