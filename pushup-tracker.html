@@ -1384,7 +1384,7 @@
     function toggleDay(date){
       const setsEl = document.getElementById(`sets-${date}`);
       const arrowEl = document.getElementById(`arrow-${date}`);
-      const headerEl = document.querySelector(`[data-date="${date}`);
+      const headerEl = document.querySelector(`[data-date="${date}"]`);
       if(setsEl.style.display === 'none'){
         setsEl.style.display = 'block';
         arrowEl.textContent = '▲';
