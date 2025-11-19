@@ -452,23 +452,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script type="module">
-  let flatpickrReady = null;
-  function loadFlatpickrLibrary() {
-    if (typeof window.flatpickr !== 'undefined') return Promise.resolve(window.flatpickr);
-    if (!flatpickrReady) {
-      flatpickrReady = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-        script.onload = () => resolve(window.flatpickr);
-        script.onerror = (err) => reject(err);
-        document.head.appendChild(script);
-      });
-    }
-    return flatpickrReady.catch(err => {
-      console.error('Flatpickr failed to load:', err);
-      return null;
-    });
-  }
     
     // --- CONSTANTS AND CONFIGURATION ---
     const CONSTANTS = {
@@ -503,7 +486,6 @@
                 'Narrow', 
                 'Inside', 
                 'Reverse - Table', // <-- MODIFICATION #1
-                'One-Leg',
                 'Other'
             ],
             
@@ -515,8 +497,7 @@
                 'Wide':     { key: 'pr_wide',     label: 'Max Wide Set' },
                 'Narrow':   { key: 'pr_narrow',   label: 'Max Narrow Set' },
                 'Inside':   { key: 'pr_inside',   label: 'Max Inside Set' },
-                'Reverse - Table': { key: 'pr_reverse_table', label: 'Max Reverse Table Set' }, // <-- MODIFICATION #2
-                'One-Leg': { key: 'pr_one_leg', label: 'Max One-Leg Set' }
+                'Reverse - Table': { key: 'pr_reverse_table', label: 'Max Reverse Table Set' } // <-- MODIFICATION #2
                 // 'Other' is intentionally not tracked as a specific PR
             },
             defaultTarget: 30
@@ -999,21 +980,12 @@
         exportDate: new Date().toISOString() 
       };
 
-      const backupPayload = JSON.stringify(fullStateForBackup, null, 2);
-      const totals = {
-        totalReps: stats.totalReps || 0,
-        totalSets: stats.totalSets || 0,
-        backupTime: exportDate,
-        backupData: backupPayload
-      };
       const templateParams = {
           subject: `${currentExercise} Tracker Backup - ${new Date().toLocaleDateString()}`,
-          ...totals,
-          // legacy/snake_case keys to satisfy existing EmailJS template placeholders
-          total_reps: totals.totalReps,
-          total_sets: totals.totalSets,
-          backup_time: totals.backupTime,
-          backup_data: totals.backupData
+          totalReps: stats.totalReps || 0,
+          totalSets: stats.totalSets || 0,
+          backupTime: exportDate,
+          backupData: JSON.stringify(fullStateForBackup, null, 2),
       };
 
       try {
