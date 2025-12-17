@@ -409,6 +409,17 @@
           </select>
         </div>
       </div>
+
+      <div class="spacer" style="margin-top: 24px;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0;font-size:20px">History</h3>
+          <div style="display:flex;gap:8px">
+              <button id="expandAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Expand All</button>
+              <button id="collapseAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Collapse All</button>
+          </div>
+      </div>
+      <div id="logContainer"></div>
+
     </section>
 
     <section class="card" aria-labelledby="summaryH" style="display:none" data-section id="summarySection">
@@ -522,20 +533,10 @@
           <button id="resetBtn" class="danger">Reset all</button>
         </div>
         
-        <details open id="logHistoryDetails">
-          <summary style="font-size: 18px; font-weight: 600; color: var(--fg); padding: 0; list-style: none;">Log History & Totals</summary>
-          <div style="margin-top: 16px;">
-              <div class="row" style="margin-bottom:16px">
-                  <button id="expandAllBtn">Expand all</button>
-                  <button id="collapseAllBtn">Collapse all</button>
-              </div>
-              <div id="logContainer"></div>
-              <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
-                  <strong>Total sets:</strong> <span id="totalSets">0</span> | 
-                  <strong>Total reps:</strong> <span id="totalReps">0</span>
-              </div>
-          </div>
-        </details>
+        <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
+            <strong>Total sets:</strong> <span id="totalSets">0</span> | 
+            <strong>Total reps:</strong> <span id="totalReps">0</span>
+        </div>
         
         <details style="margin-top:24px">
           <summary>See raw JSON</summary>
@@ -1924,8 +1925,9 @@
       }, CONSTANTS.TARGET_DEBOUNCE_MS);
     });
 
-    document.getElementById('dataModal').addEventListener('click', (e) => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
+    // --- NEW: Event Listener for Log interactions in the main Chart Section ---
+    document.getElementById('chartSection').addEventListener('click', (e) => {
+      if(!isStorageReady) return;
       
       const btn = e.target.closest('button');
       if(btn) {
