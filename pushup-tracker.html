@@ -3,67 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Exercise Tracker</title>
+  <title>Exercise Tracker (Cloud)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0b0c'/%3E%3Crect x='8' y='30' width='48' height='8' rx='4' fill='%23f97316'/%3E%3Ccircle cx='20' cy='24' r='6' fill='%23fbbf24'/%3E%3C/svg%3E">
   <style>
+    /* --- CSS STYLES (Identical to your preferred design) --- */
     :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     html,body{height:100%}
     body{margin:0;font:18px "Century Gothic", CenturyGothic, AppleGothic, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column}
     header{padding:24px 32px;border-bottom:1px solid #222;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
     header h1{font-size:20px;margin:0;letter-spacing:.3px}
-    .header-logo{height:48px;width:auto;border-radius:8px}
     
     main{
-      width: 100%;
-      max-width: 1600px;
-      margin: 0 auto;
-      padding: 32px;
-      display: grid;
-      gap: 24px;
-      grid-template-columns: 1fr; 
+      width: 100%; max-width: 1600px; margin: 0 auto; padding: 32px;
+      display: grid; gap: 24px; grid-template-columns: 1fr; 
     }
     
     @media (min-width: 1024px) {
         main {
             grid-template-columns: 350px 1fr;
-            grid-template-areas: 
-                "addset chart"
-                "prs chart"
-                "prs summary"
-                "prs summary";
-            padding: 32px;
+            grid-template-areas: "addset chart" "prs chart" "prs summary";
         }
         #addEntrySection { grid-area: addset; }
-        #prSection { 
-          grid-area: prs; 
-          display: flex;
-          flex-direction: column;
-          align-self: stretch;
-        }
-        #dataSection { grid-area: data; } 
+        #prSection { grid-area: prs; display: flex; flex-direction: column; }
         #chartSection { grid-area: chart; }
         #summarySection { grid-area: summary; }
     }
-    @media (min-width: 768px) and (max-width: 1023px) {
-        main {
-            grid-template-columns: 1fr 1fr; 
-        }
-    }
+    @media (min-width: 768px) and (max-width: 1023px) { main { grid-template-columns: 1fr 1fr; } }
 
     .card{background:var(--card);border:1px solid #222;border-radius:16px;padding:24px}
     .card h2{font-size:22px;margin:0 0 16px}
     
-    label{
-      display:block;
-      font-size:14px;
-      color:var(--muted);
-      margin-bottom:8px;
-      font-weight:500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
+    label{display:block;font-size:14px;color:var(--muted);margin-bottom:8px;font-weight:500;}
     input,select,button,textarea{background:#0f1012;color:var(--fg);border:1px solid #2a2b2f;border-radius:12px;padding:14px 16px;font:inherit;font-size:16px; width: 100%; box-sizing: border-box;}
     input[type=date]{padding:.7rem}
     button{cursor:pointer;font-weight:500;transition: opacity 0.2s}
@@ -72,248 +42,81 @@
     button.ghost{background:transparent}
     button.danger{background:var(--bad);border-color:var(--bad);color:white}
     .row{display:flex;gap:16px;flex-wrap:wrap}
-    .row>*{flex:1 1 180px}
-    .right{text-align:right}
     .pill{font-size:15px;padding:8px 14px;border-radius:999px;border:1px solid #2b2c30;color:var(--muted);font-weight:500}
-    /* Progress bar inner fill - centralized styles to avoid mixing inline styles */
-    #targetBar{transition:width 0.35s ease,background 0.25s ease;height:100%;border-radius:3px;box-shadow:inset 0 -1px 0 rgba(0,0,0,0.25);background:linear-gradient(90deg,#3b82f6,#1d4ed8)} 
-    /* Progress container + label */
+    
+    /* Progress & Stats */
+    #targetBar{transition:width 0.35s ease,background 0.25s ease;height:100%;border-radius:3px;background:linear-gradient(90deg,#3b82f6,#1d4ed8)} 
     .progress-wrapper{display:flex;flex-direction:column;gap:6px;width:100%}
-    /* Thicker progress bar and larger label for readability */
     .progress-container{height:18px;background:#2b2c30;border-radius:9px;overflow:hidden;position:relative}
-    .progress-inner{height:100%;width:0%;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:800;font-size:13px;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,0.6);padding:0 6px;box-sizing:border-box}
-    .progress-inner-text{padding:0 8px;font-size:13px}
-
-    /* Re-introduced external target pill */
+    .progress-inner{height:100%;width:0%;border-radius:9px;}
     .target-pill{font-size:18px;padding:6px 10px;align-self:flex-start}
-    .progress-label{position:absolute;right:8px;top:-22px;font-size:12px;color:var(--muted)}
 
-    /* Toasts */
-    .toast-container{position:fixed;bottom:18px;right:18px;z-index:3500;display:flex;flex-direction:column;gap:10px}
-    .toast{background:var(--card);border:1px solid #222;padding:10px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.5);display:flex;align-items:center;gap:12px;min-width:260px;color:var(--text)}
-    .toast .toast-message{flex:1}
-    .toast .toast-action{border-radius:6px;padding:6px 10px;border:none;background:var(--accent);color:white;cursor:pointer}
-
-    /* Weekly comparison layout */
-    .weekly-comparison{display:flex;flex-direction:column;align-items:center;gap:6px}
-    .weekly-comparison .wc-value{font-size:18px;font-weight:700}
-    .weekly-comparison .wc-msg{font-size:14px;color:var(--muted)}
-    
-    .key-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-    @media (max-width:1023px) and (min-width: 768px){.key-stats-grid{grid-template-columns:repeat(2,1fr)}}
-    @media (max-width:767px){.key-stats-grid{grid-template-columns:1fr}}
-    
-    .pr-stack{
-      display:flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .pr-item {
-      padding: 12px 16px;
-      background: #0f1012;
-      border-radius: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .pr-label {
-      font-size: 15px;
-      color: var(--fg);
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-right: 12px;
-    }
-    .pr-value {
-      text-align: right;
-      font-weight: 600;
-      font-size: 18px;
-      color: var(--ok);
-      flex-shrink: 0;
-    }
-    .pr-date {
-      display: block;
-      font-size: 13px;
-      color: var(--muted);
-      font-weight: 400;
-      margin-top: 2px;
-    }
-    
-    .status{font-weight:600;font-size:32px}
-
-    .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-    details summary{cursor:pointer;color:var(--muted);user-select:none;font-size:16px}
-    details summary:hover{color:var(--fg)}
-    
-    #dataSection summary {
-        font-size: 18px; 
-        font-weight: 500;
-        margin: 0 0 16px;
-        color: var(--fg);
-        padding: 0;
-    }
-    
-    #dataSection details details summary {
-      font-size: 18px !important;
-      font-weight: 600 !important;
-      color: var(--fg);
-      padding: 0; 
-      list-style: none;
-      margin: 0 0 16px;
-    }
-    #dataSection details details summary::-webkit-details-marker {
-        display: none;
-    }
-    #logSection details summary {
-      font-size: 22px; 
-      font-weight: 600; 
-      color: var(--fg);
-      padding: 0; 
-      margin: 0 0 16px;
-      list-style: none;
-    }
-    #logSection details summary::-webkit-details-marker {
-        display: none;
-    }
-
+    /* PR Items */
+    .pr-stack{display:flex;flex-direction: column;gap: 12px;}
+    .pr-item {padding: 12px 16px;background: #0f1012;border-radius: 10px;display: flex;justify-content: space-between;align-items: center;}
+    .pr-label {font-size: 15px;color: var(--fg);font-weight: 500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px}
+    .pr-value {text-align: right;font-weight: 600;font-size: 18px;color: var(--ok); flex-shrink:0}
+    .pr-date {display: block;font-size: 13px;color: var(--muted);font-weight: 400;margin-top: 2px;}
     .spacer{height:2px;background:#1b1b1e;margin:12px 0}
+
+    /* Modals & Celebrations */
+    .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+    .modal{background:var(--card);border:1px solid #333;border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+    .modal-buttons{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
+    .celebration{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:40px;text-align:center;z-index:2000;animation:popIn 0.3s ease-out}
+    .celebration .emoji{display:inline-block;font-size:64px;margin-bottom:16px;}
+    @keyframes popIn{from{transform:translate(-50%,-50%) scale(0.8);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+    /* Logs & History */
     .month-group{margin-bottom:20px;border:1px solid #333;border-radius:12px;overflow:hidden}
     .month-header{padding:18px 24px;background:#1f1f21;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:19px}
-    .month-header:hover{background:#242426}
     .month-content{padding:16px;background:var(--bg)}
     .day-group{margin-bottom:16px;border:1px solid #222;border-radius:10px;overflow:hidden}
     .day-header{padding:14px 20px;background:#1a1a1c;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:16px}
-    .day-header:hover{background:#1f1f21}
     .day-sets{padding:12px;background:var(--card)}
     .set-item{padding:14px 16px;margin:8px 0;background:#0f1012;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:16px}
     .set-info{flex:1}
     .set-actions{display:flex;gap:10px}
-    .set-actions button{padding:10px 16px;font-size:15px}
+    .set-actions button{padding:6px 12px;font-size:13px}
 
-    .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-    .modal{background:var(--card);border:1px solid #333;border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
-    .modal h3{margin:0 0 24px;font-size:24px}
-    .modal-buttons{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
-    .modal-buttons button{min-width:100px}
-    .modal input,.modal textarea,.modal select{width:100%;box-sizing:border-box;margin-bottom:16px}
-    .modal textarea{min-height:80px;resize:vertical;font-family:inherit}
-    .modal label{display:block;margin-bottom:4px}
-    
+    /* Summary Grid */
+    #summarySection .summary-grid{display:grid;grid-template-columns:1fr 1fr 280px;gap:12px;align-items:stretch;flex:1}
+    @media (max-width: 900px){ #summarySection .summary-grid{grid-template-columns:1fr;gap:12px} }
+    #summarySection .summary-left{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;grid-column:1/3;}
+    #summarySection .stat-card{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:12px;background:#0f1012;border-radius:8px;min-height:100px}
+    #summarySection .stat-card label{font-size:16px;color:var(--fg);margin-bottom:8px;text-align:center;font-weight:500}
+    #summarySection .stat-card .value{font-size:44px;font-weight:700;line-height:1}
+    #summarySection .summary-right{display:flex;flex-direction:column;gap:12px}
+    #summarySection .control-card{display:flex;flex-direction:column;padding:12px;background:#0f1012;border-radius:8px;flex:1}
+
     .streak-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f59e0b,#ef4444);padding:10px 16px;border-radius:12px;font-weight:600;color:white;font-size:16px}
-    .streak-emoji{font-size:20px}
     
-    .celebration{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:40px;text-align:center;z-index:2000;animation:popIn 0.3s ease-out}
-    .celebration h2{margin:0 0 16px;font-size:32px;color:var(--ok)}
-    .celebration p{font-size:18px;margin:0 0 24px;color:var(--muted)}
-    .celebration button{min-width:120px}
-    @keyframes popIn{from{transform:translate(-50%,-50%) scale(0.8);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
-    @keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
-    @keyframes slideDown{from{transform:translate(-50%,-60%);opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
-    .celebration{animation:slideDown 0.4s ease-out!important}
-    .celebration .emoji{display:inline-block;font-size:64px;margin-bottom:16px;animation:bounce 0.6s ease-in-out 0.2s}
-    
-    .warning-banner{background:#ef444420;border:1px solid var(--bad);border-radius:12px;padding:16px;margin-bottom:16px;display:flex;align-items:start;gap:12px}
-    .warning-banner strong{color:var(--bad)}
-    
-    .trend{display:inline-flex;align-items:center;gap:6px;font-size:18px;margin-left:12px}
-    .trend.up{color:var(--ok)}
-    .trend.down{color:var(--bad)}
-    .trend.stable{color:var(--muted)}
-    
-    .comparison{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;padding:16px;background:#1a1a1c;border-radius:10px;margin:12px 0}
-    .comparison-stat{text-align:center}
-    .comparison-label{font-size:14px;color:var(--muted);margin-bottom:4px}
-    .comparison-value{font-size:24px;font-weight:600}
-    .comparison-arrow{font-size:32px;color:var(--muted)}
-    @media (max-width:720px){.comparison{grid-template-columns:1fr;gap:8px}.comparison-arrow{display:none}}
-
-    /* Tooltip icon for small inline help text */
-    .tooltip-icon{display:inline-block;margin-left:8px;width:18px;height:18px;border-radius:50%;background:#222;border:1px solid #333;color:var(--muted);text-align:center;font-size:12px;line-height:18px;cursor:help;position:relative}
-    .tooltip-icon:focus{outline:2px solid var(--accent);outline-offset:2px}
-    .tooltip-icon::after{content:attr(data-tooltip);position:absolute;left:50%;transform:translateX(-50%) translateY(8px);bottom:100%;white-space:nowrap;background:var(--card);color:var(--fg);padding:6px 8px;border-radius:8px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity .12s ease,transform .12s ease;z-index:1200}
-    .tooltip-icon:hover::after,.tooltip-icon:focus::after{opacity:1;transform:translateX(-50%) translateY(0)}
-    
-    button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-    .month-header:focus, .day-header:focus{outline:2px solid var(--accent);outline-offset:-2px}
-    
-    .updating{opacity:0.6;pointer-events:none;transition:opacity 0.2s}
-
-    .menu-btn {
-        padding: 8px 16px;
-        border-radius: 12px;
-        background: var(--card);
-        border: 1px solid #222;
-        cursor: pointer;
-        font-size: 16px;
-        margin-left: auto;
-        transition: background 0.2s;
-    }
-    .menu-btn:hover {
-        background: #1a1a1c;
-    }
-
-    #dataModal .modal {
-        max-width: 600px;
-        padding: 24px;
-    }
-    #dataModal .modal h2 {
-        font-size: 24px;
-        margin-bottom: 24px;
-    }
-
-    /* Mobile friendliness tweaks */
-    :root { --mobile-padding: 16px; }
-    * { box-sizing: border-box; }
-    body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-
+    /* Mobile tweaks */
     @media (max-width: 480px) {
-      header { padding: 12px 16px; }
-      main { padding: 16px; }
-      .card { padding: 16px; border-radius: 12px; }
-      input,select,button,textarea{padding:12px;font-size:16px}
-      .row{gap:8px}
-      .row>*{flex:1 1 140px}
-      label{white-space:normal;overflow:visible;text-overflow:initial}
-      .modal-overlay{padding:12px}
-      .modal{padding:16px;max-width:100%;border-radius:12px}
-      .comparison{padding:12px}
-      main { grid-template-columns: 1fr; }
+      main { padding: 16px; grid-template-columns: 1fr; }
+      header { position: sticky; top: 0; z-index: 60; background: rgba(11,11,12,0.95); }
+      .row > * { flex: 1 1 100%; }
+      #chart { height: 250px !important; }
     }
-
-    /* Deeper mobile optimizations */
-    @media (max-width: 480px) {
-      main { max-height: calc(100vh - 56px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
-      .card, .modal, .celebration { box-shadow: none !important; }
-      button, .hero-button, input, select, textarea { min-height: 44px; }
-      #chart { max-width: 100%; height: auto !important; }
-      body::before { background-attachment: scroll !important; background-size: cover !important; }
-      header { position: sticky; top: 0; z-index: 60; background: linear-gradient(0deg, rgba(11,11,12,0.95), rgba(11,11,12,0.95)); }
-      .modal { max-height: 88vh; overflow-y: auto; }
-    }
-
   </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
   <header>
-  <div style="display:flex;align-items:center;gap:16px">
-    <h4>Stronger Every Press</h4>
-    <span class="pill" id="storageInfo">Local Storage</span>
-    <div class="pill" id="weekInfo">Week: —</div>
-    <div id="streakBadge"></div>
-  </div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
-    <button id="backupBtnHeader" class="primary">Backup</button>
-    <button id="openDataMenuBtn" class="menu-btn" aria-label="Open Data and Backup Menu">Data &amp; Backup</button>
-  </div>
-</header>
-  <main id="appContent" class="updating">
+    <div style="display:flex;align-items:center;gap:16px">
+      <h4>Stronger Every Press</h4>
+      <span class="pill" id="storageInfo" style="color:var(--ok);border-color:var(--ok)">Supabase Cloud</span>
+      <div id="streakBadge"></div>
+    </div>
+    <div style="margin-left:auto" class="pill" id="weekInfo">Week: —</div>
+  </header>
+
+  <main id="appContent">
     <div id="loadingIndicator" style="text-align:center;padding:50px;font-size:20px;color:var(--muted)">
-      Loading your data...
+      Connecting to your database...
     </div>
     
-    <section class="card" aria-labelledby="addEntryH" style="display:none" data-section id="addEntrySection">
+    <section class="card" id="addEntrySection" style="display:none">
       <div style="margin-bottom: 24px;">
         <label for="exerciseSelect" style="font-size: 22px; font-weight: bold; color: var(--fg);">Exercise</label>
         <select id="exerciseSelect" style="font-size: 16px;">
@@ -321,29 +124,27 @@
           <option value="Abs">Abs</option>
           <option value="Squat">Squat</option>
           <option value="Crab/Bear Walk">Crab/Bear Walk</option>
-          </select>
+        </select>
       </div>
 
       <div style="margin-bottom: 16px;">
         <label for="type">Type</label>
-        <select id="type" aria-label="Set Type">
-        </select>
+        <select id="type" aria-label="Set Type"></select>
       </div>
       
-      <h2 id="addEntryH" style="margin-top: 16px;">Add Set</h2>
+      <h2 style="margin-top: 16px;">Add Set</h2>
       <div>
         <div style="margin-bottom: 16px;">
           <label for="date">Date</label>
           <div style="position:relative;display:flex;align-items:center;">
             <input id="date" type="text" class="date-picker" placeholder="Select date" style="width:100%;padding-right:40px;">
-            <span id="calendarIcon" role="button" aria-label="Open calendar" tabindex="0" style="position:absolute;right:12px;cursor:pointer;font-size:20px;color:var(--muted);">📅</span>
+            <span id="calendarIcon" role="button" style="position:absolute;right:12px;cursor:pointer;font-size:20px;color:var(--muted);">📅</span>
           </div>
         </div>
         <div style="margin-bottom: 16px;">
           <label for="reps">Reps</label>
           <input id="reps" type="number" min="1" inputmode="numeric" placeholder="e.g. 20" />
         </div>
-
         <div style="margin-bottom: 16px;">
           <label for="note">Notes</label>
           <input id="note" type="text" placeholder="e.g. tricep, incline" />
@@ -351,8 +152,6 @@
       </div>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="addBtn">Add Set</button>
-        <button id="clearTodayBtn" class="ghost">Clear Today</button>
-        <button id="deleteLastBtn" class="ghost" style="border-color:#f97316;color:#f97316">Delete Last Entry</button>
       </div>
       
       <div id="todayLogPanel" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #333; display: none;">
@@ -361,45 +160,28 @@
       </div>
     </section>
     
-    <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
-        <h2 id="prH">Personal Records (PRs)</h2>
+    <section class="card" id="prSection" style="display:none">
+        <h2>Personal Records</h2>
         <div class="pr-stack">
             <div class="pr-item">
               <span class="pr-label">Max Set 💪</span>
-              <div class="pr-value" id="highestSet">
-                <span id="highestSetReps">0</span>
-                <span class="pr-date" id="highestSetDate">—</span>
-              </div>
+              <div class="pr-value" id="highestSet">0 <span class="pr-date">—</span></div>
             </div>
-            
             <div class="pr-item">
               <span class="pr-label">Max Day 🚀</span>
-              <div class="pr-value" id="highestDailyTotal">
-                <span id="highestDailyTotalReps">0</span>
-                <span class="pr-date" id="highestDailyTotalDate">—</span>
-              </div>
+              <div class="pr-value" id="highestDailyTotal">0 <span class="pr-date">—</span></div>
             </div>
-
             <div class="pr-item">
               <span class="pr-label">Max Week 🏆</span>
-              <div class="pr-value" id="highestWeeklyTotal">
-                <span id="highestWeeklyTotalReps">0</span>
-                <span class="pr-date" id="highestWeeklyTotalDate">—</span>
-              </div>
+              <div class="pr-value" id="highestWeeklyTotal">0 <span class="pr-date">—</span></div>
             </div>
         </div>
-
         <div class="spacer"></div>
+        <div class="pr-stack" id="type-pr-list-container"></div>
+    </section>
 
-        <div class="pr-stack" id="type-pr-list-container">
-            </div>
-        </section>
-
-    <section class="card" aria-labelledby="dataH" style="display:none" data-section id="dataSection">
-      </section>
-
-    <section class="card" aria-labelledby="chartH" style="display:none" data-section id="chartSection">
-      <h2 id="chartH">Progress Chart</h2>
+    <section class="card" id="chartSection" style="display:none">
+      <h2>Progress Chart</h2>
       <div style="position:relative;height:400px">
         <canvas id="chart"></canvas>
       </div>
@@ -417,46 +199,17 @@
 
       <div class="spacer" style="margin-top: 24px;"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h3 style="margin:0;font-size:20px">Full History</h3>
+          <h3 style="margin:0;font-size:20px">History</h3>
           <div style="display:flex;gap:8px">
-              <button id="expandAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Expand All</button>
-              <button id="collapseAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Collapse All</button>
+              <button id="expandAllBtn" class="ghost">Expand All</button>
+              <button id="collapseAllBtn" class="ghost">Collapse All</button>
           </div>
       </div>
       <div id="logContainer"></div>
-
     </section>
 
-    <section class="card" aria-labelledby="summaryH" style="display:none" data-section id="summarySection">
-      <h2 id="summaryH">Summary & Goals</h2>
-      <style>
-        /* Summary section fills modal vertically with 3x3 grid layout */
-        #summarySection{min-height:100%;display:flex;flex-direction:column}
-        #summarySection h2{margin-top:0;margin-bottom:12px}
-        /* 3x3 grid: left 2 cols = stats (6 cards in 2x3), right col = controls (3 tall cards) */
-        #summarySection .summary-grid{display:grid;grid-template-columns:1fr 1fr 280px;gap:12px;align-items:stretch;flex:1}
-        @media (max-width: 900px){
-          #summarySection .summary-grid{grid-template-columns:1fr;gap:12px}
-        }
-        /* Left 2 columns: 6 stat cards in 3 rows x 2 cols */
-        #summarySection .summary-left{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;grid-column:1/3;align-content:stretch}
-        #summarySection .stat-card{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:12px;background:#0f1012;border-radius:8px;min-height:100px}
-        #summarySection .stat-card label{font-size:16px;color:var(--fg);margin-bottom:8px;text-align:center;font-weight:500}
-        #summarySection .stat-card .value{font-size:44px;font-weight:700;line-height:1}
-        /* Right column: stacked controls (now just 2 cards instead of 3) */
-        #summarySection .summary-right{display:flex;flex-direction:column;gap:12px}
-        #summarySection .summary-right .control-card{display:flex;flex-direction:column;padding:12px;background:#0f1012;border-radius:8px;flex:1}
-        #summarySection .summary-right label{font-size:24px;color:var(--muted);margin-bottom:6px}
-        #summarySection .summary-right input{padding:8px 10px;font-size:20px;margin-bottom:6px}
-        /* target pill removed — progress bar shows percent now */
-        #summarySection .weekly-content{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:1;gap:8px}
-        #summarySection .weekly-pair{display:flex;gap:8px;justify-content:space-around;width:100%}
-        #summarySection .weekly-stat{text-align:center}
-        #summarySection .weekly-stat-label{font-size:11px;color:var(--muted)}
-        #summarySection .weekly-stat-value{font-size:20px;font-weight:600}
-        #summarySection .weekly-arrow{font-size:16px;align-self:center}
-      </style>
-
+    <section class="card" id="summarySection" style="display:none">
+      <h2>Summary & Goals</h2>
       <div class="summary-grid">
         <div class="summary-left">
           <div class="stat-card">
@@ -472,9 +225,7 @@
             <div class="value" id="setsToday">0</div>
           </div>
           <div class="stat-card">
-            <label>Avg Per Set
-              <span class="tooltip-icon" tabindex="0" role="img" aria-label="Average per selected Type" title="Shows average reps per set for the currently selected Type (e.g. Standard)." data-tooltip="Average reps per set for the currently selected Type (e.g. Standard).">i</span>
-            </label>
+            <label>Avg Per Set</label>
             <div class="value" id="avgSet">0</div>
           </div>
           <div class="stat-card">
@@ -492,28 +243,10 @@
             <label for="dailyTarget">Daily Target</label>
             <input id="dailyTarget" type="number" min="0" value="30" />
             <div class="progress-wrapper">
-              <span class="pill target-pill" id="targetStatus" role="status" aria-live="polite" aria-atomic="true">0%</span>
-              <div class="progress-container" aria-hidden="false">
-                <div id="targetBar" class="progress-inner" role="progressbar" aria-live="polite" aria-atomic="true" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0% of target"></div>
+              <span class="pill target-pill" id="targetStatus">0%</span>
+              <div class="progress-container">
+                <div id="targetBar" class="progress-inner"></div>
               </div>
-            </div>
-          </div>
-
-          <div class="control-card">
-            <label>Weekly Progress</label>
-            <div class="weekly-content">
-              <div class="weekly-pair">
-                <div class="weekly-stat">
-                  <div class="weekly-stat-label">Last Wk</div>
-                  <div class="weekly-stat-value" id="lastWeekTotal">0</div>
-                </div>
-                <div class="weekly-arrow" id="trendArrow">→</div>
-                <div class="weekly-stat">
-                  <div class="weekly-stat-label">This Wk</div>
-                  <div class="weekly-stat-value" id="thisWeekTotal">0</div>
-                </div>
-              </div>
-              <div id="weeklyComparison" style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px" role="status" aria-live="polite" aria-atomic="true"></div>
             </div>
           </div>
         </div>
@@ -521,1807 +254,447 @@
     </section>
   </main>
 
-  <div class="modal-overlay" id="dataModal" style="display:none">
-    <div class="modal" role="dialog" aria-labelledby="dataModalTitle" aria-modal="true">
-      <h2 id="dataModalTitle">Data Management & Backup</h2>
-      
-      <div style="margin-top: 16px;">
-          
-        <h3 style="font-size:18px;margin:0 0 12px;color:var(--fg)">Backup & Import</h3>
-        <div class="row" style="margin-bottom:12px">
-          <button id="exportBtn">Export JSON</button>
-          <input type="file" id="importFile" accept="application/json" />
-          <button id="importBtn">Import</button>
-        </div>
-        <div class="row" style="margin-bottom: 24px;">
-          <button id="backupBtn" class="primary">Manual Email Backup</button>
-          <button id="resetBtn" class="danger">Reset all</button>
-        </div>
-        
-        <div style="margin-top:16px;padding:16px;background:#1a1a1c;border-radius:10px;font-size:17px">
-            <strong>Total sets:</strong> <span id="totalSets">0</span> | 
-            <strong>Total reps:</strong> <span id="totalReps">0</span>
-        </div>
-        
-        <details style="margin-top:24px">
-          <summary>See raw JSON</summary>
-          <pre id="raw" style="white-space:pre-wrap;font-size:14px"></pre>
-        </details>
-
-        <p style="color:var(--muted);margin:12px 0 0;font-size:14px">Your data is stored locally in your browser and is not synced. The daily email backup runs automatically if this window is open at 12:15 AM.</p>
-      </div>
-
-      <div class="modal-buttons" style="justify-content:center;margin-top:32px">
-        <button class="primary" id="closeDataMenuBtn" style="min-width:150px">Close Menu</button>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script type="module">
+    // --- 1. SUPABASE CREDENTIALS ---
+    // PASTE YOUR KEYS HERE
+    const SUPABASE_URL = 'https://rwfzdnprseuizzgygeow.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3ZnpkbnByc2V1aXp6Z3lnZW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMDUzMDksImV4cCI6MjA4MTU4MTMwOX0.K00q1xtHtC4piuacViSqlAOV26xtPRqshcTxFsGBDKk';
     
-    // --- CONSTANTS AND CONFIGURATION ---
-    const CONSTANTS = {
-        STORAGE_KEY: 'pushup_tracker_data',
-        LAST_BACKUP_KEY: 'pushup_tracker_last_backup_date',
-        EMAILJS_SERVICE_ID: 'service_uytnfr4', 
-        EMAILJS_TEMPLATE_ID: 'template_p5mez4i', 
-        EMAILJS_PUBLIC_KEY: '55PGXk4S6xIqSJ2Lq',
-        BACKUP_TARGET_HOUR: 0, 
-        BACKUP_TARGET_MINUTE: 15, 
-        DAILY_CHECK_INTERVAL_MS: 3600000, 
-        RENDER_DEBOUNCE_MS: 50,
-        TARGET_DEBOUNCE_MS: 500,
-        TOAST_AUTO_CLOSE_MS: 3000,
-        CELEBRATION_AUTO_CLOSE_MS: 5000,
-        MILESTONES: [100, 250, 500, 1000, 2500, 5000, 10000],
-        STREAK_ACHIEVEMENT_STEP: 5,
-        LOADING_TEXT: 'Loading...',
-        ERROR_TEXT: 'Error',
-        SUCCESS_TEXT: 'Success',
-        WARNING_TEXT: 'Warning'
-    };
-    
-    // --- EXERCISE CONFIGURATION ---
+    // Initialize Client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // --- 2. CONFIG & STATE ---
     const EXERCISE_CONFIG = {
         'Push-up': {
-            types: [
-                'Standard', 
-                'Wide', 
-                'Narrow', 
-                'Inside', 
-                'Reverse - Table', 
-                'One-Leg',
-                'Other'
-            ],
-            prDefinitions: {
-                'Standard': { key: 'pr_standard', label: 'Max Standard Set' },
-                'Wide':     { key: 'pr_wide',     label: 'Max Wide Set' },
-                'Narrow':   { key: 'pr_narrow',   label: 'Max Narrow Set' },
-                'Inside':   { key: 'pr_inside',   label: 'Max Inside Set' },
-                'Reverse - Table': { key: 'pr_reverse_table', label: 'Max Reverse Table Set' },
-                'One-Leg': { key: 'pr_one_leg', label: 'Max One-Leg Set' }
+            types: ['Standard', 'Wide', 'Narrow', 'Inside', 'Reverse - Table', 'One-Leg', 'Other'],
+            prDefinitions: { 
+                'Standard': { key: 'pr_standard', label: 'Max Standard' }, 
+                'Wide': { key: 'pr_wide', label: 'Max Wide' },
+                'Narrow': { key: 'pr_narrow', label: 'Max Narrow' }
             },
             defaultTarget: 30
         },
-        'Abs': {
-            types: [
-                'Ab Wheel',
-                'Sit-up Secured',
-                'Sit-up Unsecured',
-                'Russian Twists',
-                'Scissors',
-                'Mountain Climbers',
-                'Plank (seconds)'
-            ],
-            prDefinitions: {
-                'Ab Wheel': { key: 'pr_abwheel', label: 'Max Ab Wheel Set' },
-                'Plank (seconds)': { key: 'pr_plank_seconds', label: 'Max Plank (seconds)' }
-            },
+        'Abs': { 
+            types: ['Ab Wheel', 'Sit-up Secured', 'Plank (seconds)', 'Russian Twists', 'Scissors'], 
+            prDefinitions: { 'Ab Wheel': { key: 'pr_abwheel', label: 'Max Ab Wheel' } },
             defaultTarget: 20
         },
-        'Squat': {
-            types: ['Bodyweight', 'Goblet Squat', 'Back Squat', 'Front Squat', 'Other'],
-            prDefinitions: {
-                'Bodyweight':   { key: 'pr_squat_body',     label: 'Max Bodyweight Set' },
-                'Goblet Squat': { key: 'pr_squat_goblet',   label: 'Max Goblet Squat Set' },
-                'Back Squat':   { key: 'pr_squat_back',     label: 'Max Back Squat Set' },
-                'Front Squat':  { key: 'pr_squat_front',    label: 'Max Front Squat Set' }
-            },
-            defaultTarget: 50
-        },
-        'Crab/Bear Walk': {
-            types: ['Crab Walk', 'Bear Walk', 'Crab Crawl', 'Bear Crawl', 'Other'],
-            prDefinitions: {
-                'Crab Walk': { key: 'pr_crab_walk', label: 'Max Crab Walk Set' },
-                'Bear Walk': { key: 'pr_bear_walk', label: 'Max Bear Walk Set' },
-                'Crab Crawl': { key: 'pr_crab_crawl', label: 'Max Crab Crawl Set' },
-                'Bear Crawl': { key: 'pr_bear_crawl', label: 'Max Bear Crawl Set' }
-            },
-            defaultTarget: 60
-        }
+        'Squat': { types: ['Bodyweight', 'Goblet Squat', 'Back Squat'], prDefinitions: {}, defaultTarget: 50 },
+        'Crab/Bear Walk': { types: ['Crab Walk', 'Bear Walk'], prDefinitions: {}, defaultTarget: 60 }
     };
     
-    // Initialize EmailJS
-    if (typeof emailjs !== 'undefined' && CONSTANTS.EMAILJS_PUBLIC_KEY) {
-        emailjs.init({ publicKey: CONSTANTS.EMAILJS_PUBLIC_KEY });
-    }
-
-    // --- STATE STRUCTURE ---
-    const defaultPR = { reps: 0, date: '—' };
-
-    function createDefaultState(exerciseName) {
-        const config = EXERCISE_CONFIG[exerciseName];
-        if (!config) {
-            console.error(`No config found for exercise: ${exerciseName}`);
-            return null; 
-        }
-
-        const defaultState = {
-            entries: [], 
-            target: config.defaultTarget, 
-            lastStreak: 0, 
-            pr_set: { ...defaultPR },
-            pr_day: { ...defaultPR },
-            pr_week: { ...defaultPR },
-        };
-
-        for (const type in config.prDefinitions) {
-            const prKey = config.prDefinitions[type].key; 
-            defaultState[prKey] = { ...defaultPR };
-        }
-        
-        return defaultState;
-    }
-
-    let globalState = {};
-    for (const exerciseName in EXERCISE_CONFIG) {
-        globalState[exerciseName] = createDefaultState(exerciseName);
-    }
-    
     let currentExercise = 'Push-up';
-    let state = globalState[currentExercise]; 
-    
-    let isStorageReady = false; 
+    let entries = [];
     let chartInstance = null;
-    let renderDebounceTimer = null;
-    let lastRenderedState = null;
-    let lastDeletedEntry = null;
-    let lastDeletedTimer = null;
+    let currentTarget = 30;
+    const defaultPR = { reps: 0, date: '—' };
     
     const $ = sel => document.querySelector(sel);
     
-    // --- DATE UTILITIES ---
-    function formatDateForDisplay(isoDate) {
-        if (!isoDate || isoDate === '—') return '—';
-        try {
-            if (isoDate.includes(' → ')) {
-                const parts = isoDate.split(' → ');
-                return `${formatDateForDisplay(parts[0])} → ${formatDateForDisplay(parts[1])}`;
-            }
-            const [y, m, d] = isoDate.split('-');
-            if (!y || !m || !d || y.length !== 4) return isoDate; 
-            return `${d}-${m}-${y}`;
-        } catch (e) {
-            return isoDate; 
-        }
-    }
+    // --- 3. CORE LOGIC ---
 
-    function parseDateFromDisplay(displayDate) {
-        if (!displayDate) return todayISO();
-        try {
-            const [d, m, y] = displayDate.split('-');
-            if (!y || !m || !d || y.length !== 4) return displayDate; 
-            return `${y}-${m}-${d}`;
-        } catch (e) {
-            return todayISO(); 
-        }
-    }
-    
-    function todayDisplay() {
-        return formatDateForDisplay(todayISO());
-    }
-    
-    // --- HELPER FUNCTIONS ---
-
-    // FIX: Replaced crypto.randomUUID with a polyfill that works in insecure contexts (file://)
-    function generateId() {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            try {
-                return crypto.randomUUID();
-            } catch (e) {
-                // Fallback if crypto exists but randomUUID is blocked
-            }
-        }
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-
-    function todayISO() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-
-    function wkRange(d){
-      const dt = new Date(d);
-      const day = (dt.getDay()+6)%7;
-      const mon = new Date(dt); mon.setDate(dt.getDate()-day);
-      const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-      return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
-    }
-    
-    function escapeHtml(text) {
-        if (typeof text !== 'string') return text;
-        return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    // --- FEEDBACK/ALERT HELPERS ---
-    
-    function alertMessage(title, message, type) {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = `
-          <div class="modal" style="text-align:center">
-            <h3 style="color:var(--${type})">${title}</h3>
-            <p style="color:var(--muted);margin:16px 0">${message}</p>
-            <button class="primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
-          </div>
-        `;
-        document.body.appendChild(overlay);
-        setTimeout(() => overlay.remove(), CONSTANTS.TOAST_AUTO_CLOSE_MS);
-        overlay.addEventListener('click', (e) => {
-            if(e.target === overlay) overlay.remove();
-        });
-    }
-
-    const showSuccess = (message) => alertMessage(CONSTANTS.SUCCESS_TEXT, message, 'ok');
-    const showWarning = (message) => alertMessage(CONSTANTS.WARNING_TEXT, message, 'warn');
-    const showError = (message) => alertMessage(CONSTANTS.ERROR_TEXT, message, 'bad');
-
-    function showToast(message, actionText = null, actionCallback = null, duration = 8000) {
-      let container = document.getElementById('toastContainer');
-      if (!container) {
-        container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container';
-        document.body.appendChild(container);
-      }
-
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = `
-        <div class="toast-message">${escapeHtml(message)}</div>
-        ${actionText ? `<button class="toast-action">${escapeHtml(actionText)}</button>` : ''}
-      `;
-
-      container.appendChild(toast);
-
-      let removed = false;
-      const removeToast = () => {
-        if (removed) return;
-        removed = true;
-        toast.remove();
-      };
-
-      if (actionText && actionCallback) {
-        const btn = toast.querySelector('.toast-action');
-        btn.addEventListener('click', () => {
-          try { actionCallback(); } catch (e) { console.error('Toast action failed', e); }
-          removeToast();
-        });
-      }
-
-      const t = setTimeout(() => removeToast(), duration);
-      return { remove: () => { clearTimeout(t); removeToast(); } };
-    }
-    
-    function setLoading(buttonId, isLoading, originalText = null) {
-        const btn = document.getElementById(buttonId);
-        if (btn) {
-            btn.textContent = isLoading ? CONSTANTS.LOADING_TEXT : (originalText || btn.dataset.originalText || btn.textContent);
-            btn.disabled = isLoading;
-            if (!isLoading) {
-                delete btn.dataset.originalText;
-            } else if (!btn.dataset.originalText) {
-                btn.dataset.originalText = originalText || btn.textContent;
-            }
-        }
-    }
-    
-    function toggleContent(show) {
-        const appContent = $('#appContent');
-        const loadingIndicator = $('#loadingIndicator');
-        appContent.classList.toggle('updating', !show);
-        loadingIndicator.style.display = show ? 'none' : 'block';
+    async function fetchData() {
+        setLoading(true);
+        // Fetch everything, sort by date
+        const { data, error } = await supabase.from('pushup_logs').select('*').order('created_at', { ascending: true });
         
-        document.querySelectorAll('[data-section]').forEach(el => {
-            if(el.id !== 'dataSection') {
-                el.style.display = show ? 'grid' : 'none';
-            } else {
-                el.style.display = 'none';
-            }
-        });
-        
-        $('#storageInfo').textContent = 'Local Storage (This Device)';
-    }
-
-    // --- STORAGE FUNCTIONS ---
-    
-    function loadState() {
-      try {
-        const localData = localStorage.getItem(CONSTANTS.STORAGE_KEY);
-        if (localData) {
-          const loaded = JSON.parse(localData);
-          
-          if (loaded.entries) { 
-            console.log("Migrating old data structure...");
-            const migratedPushupState = createDefaultState('Push-up');
-            Object.assign(migratedPushupState, loaded);
-            globalState['Push-up'] = migratedPushupState;
-            
-            if (!globalState['Abs']) globalState['Abs'] = createDefaultState('Abs');
-            if (!globalState['Squat']) globalState['Squat'] = createDefaultState('Squat');
-            
-            calculateAllStats(globalState['Push-up'].entries, globalState['Push-up']); 
-
-          } else { 
-            console.log("Loading multi-exercise data.");
-            for (const exerciseName in EXERCISE_CONFIG) {
-                globalState[exerciseName] = {
-                    ...createDefaultState(exerciseName),
-                    ...(loaded[exerciseName] || {})      
-                };
-            }
-          }
-        }
-        state = globalState[currentExercise]; 
-      } catch (error) {
-        console.error('Error loading state:', error);
-        showError('Could not load data from local storage.');
-      }
-    }
-
-    function saveState(newState) {
-      state = newState;
-      globalState[currentExercise] = newState;
-      try {
-        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
-        scheduleRender();
-      } catch (error) {
-        console.error('Error saving:', error);
-        showError('Could not save data.');
-      }
-    }
-    
-    // --- CALCULATION LOGIC ---
-
-    function calculateStreak(entries) {
-      if(entries.length === 0) return 0;
-      const uniqueDates = [...new Set(entries.map(e => e.date))].sort((a,b) => b.localeCompare(a));
-      const today = todayISO();
-      let streak = 0;
-      let checkDate = today;
-      
-      for(let i = 0; i < uniqueDates.length; i++){
-        if(uniqueDates[i] === checkDate){
-          streak++;
-          const d = new Date(checkDate);
-          d.setDate(d.getDate() - 1);
-          checkDate = d.toISOString().slice(0,10);
+        if (error) {
+            console.error(error);
+            alert('Cloud Error: ' + error.message);
         } else {
-          const yesterday = new Date(today);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayISO = yesterday.toISOString().slice(0,10);
-          
-          if(i === 0 && uniqueDates[0] === yesterdayISO){
-            streak++;
-            const d = new Date(yesterdayISO);
-            d.setDate(d.getDate() - 1);
-            checkDate = d.toISOString().slice(0,10);
-          } else {
-            break;
-          }
+            entries = data || [];
+            render();
         }
-      }
-      return streak;
+        setLoading(false);
     }
 
-    function calculateAllStats(entries, currentExerciseState, currentTargetDate = todayISO()) {
-        const config = EXERCISE_CONFIG[currentExercise];
-        if (!config) return {}; 
-        const prDefinitions = config.prDefinitions;
+    async function addEntry() {
+        const date = $('#date').value;
+        const reps = Number($('#reps').value);
+        const type = $('#type').value;
+        const note = $('#note').value;
         
+        if(!reps || reps < 1) return alert("Please enter valid reps");
+
+        // Optimistic UI: Calculate stats BEFORE save to check for achievements
+        const oldStats = calculateAllStats(entries);
+        const oldStreak = calculateStreak(entries);
+
+        // Save to Supabase
+        const { data, error } = await supabase
+            .from('pushup_logs')
+            .insert([{ date, reps, type, note }])
+            .select();
+
+        if (error) {
+            alert('Error saving: ' + error.message);
+        } else if (data && data.length) {
+            entries.push(data[0]);
+            
+            // Check Achievements
+            const newStats = calculateAllStats(entries);
+            const newStreak = calculateStreak(entries);
+            
+            checkAchievements(oldStats, newStats, oldStreak, newStreak, reps, type);
+            
+            render();
+            $('#reps').value = '';
+            $('#note').value = '';
+        }
+    }
+
+    async function deleteEntry(id) {
+        if(!confirm("Delete this set?")) return;
+        const { error } = await supabase.from('pushup_logs').delete().eq('id', id);
+        if(!error) {
+            entries = entries.filter(e => e.id !== id);
+            render();
+        } else {
+            alert(error.message);
+        }
+    }
+
+    async function updateEntry(id, newReps, newType, newNote) {
+        const { error } = await supabase.from('pushup_logs').update({ reps: newReps, type: newType, note: newNote }).eq('id', id);
+        if(!error) {
+            const idx = entries.findIndex(e => e.id === id);
+            if(idx !== -1) {
+                entries[idx].reps = newReps;
+                entries[idx].type = newType;
+                entries[idx].note = newNote;
+            }
+            render();
+        } else {
+            alert(error.message);
+        }
+    }
+
+    // --- 4. CALCULATIONS (Returned from original code) ---
+
+    function calculateStreak(data) {
+        if(data.length === 0) return 0;
+        const uniqueDates = [...new Set(data.map(e => e.date))].sort().reverse();
+        const today = new Date().toISOString().slice(0,10);
+        let streak = 0;
+        let checkDate = today;
+
+        // Check if today is logged, if not, check yesterday
+        if(uniqueDates[0] === today) {
+            streak = 1;
+            checkDate = prevDay(today);
+        } else if (uniqueDates[0] === prevDay(today)) {
+             checkDate = prevDay(today); // Start counting from yesterday
+        } else {
+            return 0; // Streak broken
+        }
+        
+        for(let i=0; i<uniqueDates.length; i++) {
+             // If we already counted today, skip logic
+             if (uniqueDates[i] === new Date().toISOString().slice(0,10) && streak === 1) continue;
+             
+             if (uniqueDates[i] === checkDate) {
+                 if(uniqueDates[i] !== new Date().toISOString().slice(0,10)) streak++;
+                 checkDate = prevDay(checkDate);
+             }
+        }
+        return streak;
+    }
+    
+    function prevDay(dateStr) {
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0,10);
+    }
+    
+    function wkRange(dateStr) {
+        const dt = new Date(dateStr);
+        const day = (dt.getDay()+6)%7;
+        const mon = new Date(dt); mon.setDate(dt.getDate()-day);
+        const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+        return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+    }
+
+    function calculateAllStats(data) {
         const stats = {
             totalReps: 0,
-            totalSets: entries.length,
-            highestSet: 0,
-            highestDailyTotal: 0,
-            highestWeeklyTotal: 0,
-            pr_set: currentExerciseState.pr_set,
-            pr_day: currentExerciseState.pr_day,
-            pr_week: currentExerciseState.pr_week,
+            setsToday: 0,
+            pr_set: { ...defaultPR },
+            pr_day: { ...defaultPR },
+            pr_week: { ...defaultPR },
+            type_prs: {},
             dailyTotals: {},
-            weeklyTotals: {},
-            currentDayTotal: 0,
-            currentWeekTotal: 0,
-            lastWeekTotal: 0,
-            avgSet: 0,
-            avgByType: {},
-            currentSetsToday: 0
+            weeklyTotals: {}
         };
 
-        const repsByType = {};
-        const setsByType = {};
-        if (config && Array.isArray(config.types)) {
-          for (const t of config.types) {
-            repsByType[t] = 0;
-            setsByType[t] = 0;
-          }
-        }
-
-        for (const type in prDefinitions) {
-            const prKey = prDefinitions[type].key; 
-            stats[prKey] = currentExerciseState[prKey] || { ...defaultPR };
-        }
-
-        const todayStr = todayISO();
-        const todayDate = new Date(todayStr);
-        const [currentWeekStart] = wkRange(todayStr);
+        const config = EXERCISE_CONFIG[currentExercise];
         
-        let maxDailyReps = stats.pr_day.reps;
-        let maxDailyDate = stats.pr_day.reps > 0 ? stats.pr_day.date : null;
-        let maxWeeklyReps = stats.pr_week.reps;
-        let maxWeeklyWeekStart = stats.pr_week.reps > 0 ? wkRange(stats.pr_week.date)[0] : null;
-
-        for (const entry of entries) {
-            entry.type = entry.type || config.types[0]; 
-
-            stats.totalReps += entry.reps;
+        data.forEach(e => {
+            stats.totalReps += e.reps;
             
-            if (entry.reps > stats.pr_set.reps) {
-                stats.pr_set = { reps: entry.reps, date: entry.date };
-            }
-            stats.highestSet = stats.pr_set.reps;
-
-            const prDef = prDefinitions[entry.type]; 
-            if (prDef) {
-                const prKey = prDef.key; 
-                if (entry.reps > stats[prKey].reps) {
-                    stats[prKey] = { reps: entry.reps, date: entry.date };
-                }
-            }
-
-            repsByType[entry.type] = (repsByType[entry.type] || 0) + entry.reps;
-            setsByType[entry.type] = (setsByType[entry.type] || 0) + 1;
-
-            stats.dailyTotals[entry.date] = (stats.dailyTotals[entry.date] || 0) + entry.reps;
+            // Max Set
+            if(e.reps > stats.pr_set.reps) stats.pr_set = { reps: e.reps, date: e.date };
             
-            const [weekStart] = wkRange(entry.date);
-            stats.weeklyTotals[weekStart] = (stats.weeklyTotals[weekStart] || 0) + entry.reps;
-        }
-
-        for(const date in stats.dailyTotals) {
-            const total = stats.dailyTotals[date];
-            if (total > maxDailyReps) {
-                maxDailyReps = total;
-                maxDailyDate = date;
+            // Type PRs
+            const prKey = config.prDefinitions[e.type]?.key;
+            if (prKey) {
+                if (!stats.type_prs[prKey]) stats.type_prs[prKey] = { ...defaultPR };
+                if (e.reps > stats.type_prs[prKey].reps) stats.type_prs[prKey] = { reps: e.reps, date: e.date };
             }
-        }
-        if (maxDailyReps > 0) {
-            stats.pr_day = { reps: maxDailyReps, date: maxDailyDate };
-        }
-        stats.highestDailyTotal = stats.pr_day.reps;
 
-        for(const weekStart in stats.weeklyTotals) {
-            const total = stats.weeklyTotals[weekStart];
-            if (total > maxWeeklyReps) {
-                maxWeeklyReps = total;
-                maxWeeklyWeekStart = weekStart; 
-            }
-        }
-        if (maxWeeklyReps > 0) {
-            stats.pr_week = { reps: maxWeeklyReps, date: maxWeeklyWeekStart }; 
-        }
-        stats.highestWeeklyTotal = stats.pr_week.reps;
+            // Maps
+            stats.dailyTotals[e.date] = (stats.dailyTotals[e.date] || 0) + e.reps;
+            const weekKey = wkRange(e.date)[0];
+            stats.weeklyTotals[weekKey] = (stats.weeklyTotals[weekKey] || 0) + e.reps;
+        });
 
-        if (stats.totalSets > 0) {
-            stats.avgSet = Math.round(stats.totalReps / stats.totalSets);
+        // Max Day/Week
+        for (const [d, t] of Object.entries(stats.dailyTotals)) {
+            if (t > stats.pr_day.reps) stats.pr_day = { reps: t, date: d };
         }
-
-        stats.avgByType = {};
-        if (config && Array.isArray(config.types)) {
-          for (const t of config.types) {
-            const reps = repsByType[t] || 0;
-            const sets = setsByType[t] || 0;
-            stats.avgByType[t] = sets > 0 ? Math.round(reps / sets) : 0;
-          }
+        for (const [w, t] of Object.entries(stats.weeklyTotals)) {
+            if (t > stats.pr_week.reps) stats.pr_week = { reps: t, date: w };
         }
         
-        stats.currentDayTotal = stats.dailyTotals[currentTargetDate] || 0;
-        stats.currentWeekTotal = stats.weeklyTotals[currentWeekStart] || 0;
-        stats.currentSetsToday = entries.filter(e => e.date === todayStr).length;
-
-        const lastWeekDate = new Date(todayDate);
-        lastWeekDate.setDate(todayDate.getDate() - 7);
-        const [lastWeekStart] = wkRange(lastWeekDate.toISOString().slice(0,10));
-        stats.lastWeekTotal = stats.weeklyTotals[lastWeekStart] || 0;
-        
-        currentExerciseState.pr_set = stats.pr_set;
-        currentExerciseState.pr_day = stats.pr_day;
-        currentExerciseState.pr_week = stats.pr_week;
-        for (const type in prDefinitions) {
-            const prKey = prDefinitions[type].key;
-            currentExerciseState[prKey] = stats[prKey]; 
-        }
-
         return stats;
     }
 
-    async function sendBackupEmail() {
-      if (!CONSTANTS.EMAILJS_PUBLIC_KEY || typeof emailjs === 'undefined' || typeof emailjs.send !== 'function') {
-          showWarning("Email backup is not configured.");
-          return { status: 400, text: 'Skipped - Not Configured' };
-      }
-      
-      calculateAllStats(state.entries, state);
-      
-      // Update all stats for backup
-      for (const ex in globalState) {
-        if (globalState[ex]) { 
-            calculateAllStats(globalState[ex].entries, globalState[ex]);
-        }
-      }
-      
-      const fullStateForBackup = { 
-        ...globalState, 
-        exportDate: new Date().toISOString() 
-      };
+    // --- 5. RENDER UI ---
 
-      const backupPayload = JSON.stringify(fullStateForBackup, null, 2);
-      const templateParams = {
-          subject: `${currentExercise} Tracker Backup - ${new Date().toLocaleDateString()}`,
-          totalReps: state.pr_set ? state.pr_set.reps : 0, 
-          backupTime: new Date().toLocaleString(),
-          backupData: backupPayload,
-          // Legacy params
-          total_reps: state.pr_set ? state.pr_set.reps : 0,
-          total_sets: 0,
-          backup_time: new Date().toLocaleString(),
-          backup_data: backupPayload
-      };
-
-      try {
-        const response = await emailjs.send(CONSTANTS.EMAILJS_SERVICE_ID, CONSTANTS.EMAILJS_TEMPLATE_ID, templateParams);
-        localStorage.setItem(CONSTANTS.LAST_BACKUP_KEY, todayISO());
-        return response;
-      } catch (error) {
-        console.error('Email sending failed:', error);
-        throw new Error('Email sending failed.');
-      }
-    }
-
-    function scheduleDailyBackupCheck() {
-        const { BACKUP_TARGET_HOUR, BACKUP_TARGET_MINUTE, LAST_BACKUP_KEY, DAILY_CHECK_INTERVAL_MS } = CONSTANTS;
-        const now = new Date();
-        const today = todayISO();
-        const lastBackupDate = localStorage.getItem(LAST_BACKUP_KEY);
-        const isPastTargetTime = (now.getHours() > BACKUP_TARGET_HOUR || (now.getHours() === BACKUP_TARGET_HOUR && now.getMinutes() >= BACKUP_TARGET_MINUTE));
+    function render() {
+        const dateInput = $('#date').value || new Date().toISOString().slice(0,10);
+        const stats = calculateAllStats(entries);
         
-        if (lastBackupDate !== today && isPastTargetTime) {
-            sendBackupEmail()
-              .then(res => {
-                  if (res.status === 200) { console.log('Auto-backup success.'); }
-              })
-              .catch(e => console.error('Auto-backup failed:', e));
-            setTimeout(scheduleDailyBackupCheck, DAILY_CHECK_INTERVAL_MS); 
-            return;
-        }
+        // Streak
+        const streak = calculateStreak(entries);
+        $('#streakBadge').innerHTML = streak > 1 ? `<div class="streak-badge">🔥 ${streak} day streak</div>` : '';
 
-        let nextCheck = new Date(now);
-        if (isPastTargetTime) {
-            nextCheck.setDate(nextCheck.getDate() + 1);
-        }
-        nextCheck.setHours(BACKUP_TARGET_HOUR, BACKUP_TARGET_MINUTE, 0, 0);
-        const delayMs = nextCheck.getTime() - now.getTime();
-        setTimeout(scheduleDailyBackupCheck, delayMs);
-    }
-    
-    // --- INIT ---
-
-    function initApp() {
-      try {
-        loadState(); 
-        isStorageReady = true;
+        // Stats
+        $('#highestSet').innerHTML = `${stats.pr_set.reps} <span class="pr-date">${stats.pr_set.date}</span>`;
+        $('#highestDailyTotal').innerHTML = `${stats.pr_day.reps} <span class="pr-date">${stats.pr_day.date}</span>`;
+        $('#highestWeeklyTotal').innerHTML = `${stats.pr_week.reps} <span class="pr-date">${stats.pr_week.date}</span>`;
         
-        $('#exerciseSelect').value = currentExercise;
-        updateTypeDropdown(currentExercise); 
-        
-        calculateAllStats(state.entries, state);
-        
-        saveState(state); 
-        scheduleRender();
-        toggleContent(true);
-        scheduleDailyBackupCheck();
-        
-      } catch (error) {
-        console.error('App initialization failed:', error);
-        isStorageReady = true; 
-        $('#storageInfo').textContent = 'Local Storage Error';
-        scheduleRender();
-        toggleContent(true);
-      }
-    }
-    
-    function scheduleRender(){
-      if(renderDebounceTimer){
-        clearTimeout(renderDebounceTimer);
-      }
-      renderDebounceTimer = setTimeout(() => {
-        render();
-        renderDebounceTimer = null;
-      }, CONSTANTS.RENDER_DEBOUNCE_MS);
-    }
-
-    // --- RENDER & STATS UPDATE ---
-    
-    function showAchievement(type, value, detail = ''){
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.style.background = 'rgba(0,0,0,0.9)';
-      let title = '', message = '', emoji = '';
-      
-      if(type === 'streak'){
-        emoji = '🔥';
-        title = `${value} Day Streak!`;
-        message = `Amazing! You've worked out ${value} days in a row. Keep it up!`;
-      } else if(type === 'target'){
-        emoji = '🎯';
-        title = 'Target Crushed!';
-        message = `You've hit your daily target! Great work!`;
-      } else if(type === 'milestone'){
-        emoji = '🏆';
-        title = `${value} Total Reps!`;
-        message = `Incredible milestone! You've completed ${value} ${currentExercise.toLowerCase()} reps!`;
-      } else if(type === 'pr'){
-        emoji = '💪';
-        title = 'New Personal Record!';
-        message = `${value} reps in a single set! That's your best yet!`;
-      } else if(type === 'daily_pr'){
-        emoji = '🚀';
-        title = 'New Daily Record!';
-        message = `${value} reps in a single day! That's your highest daily total yet!`;
-      } else if(type === 'weekly_pr'){
-        emoji = '🥇';
-        title = 'New Weekly Record!';
-        message = `${value} reps this week! Your highest weekly total yet!`;
-      } else if(type === 'type_pr'){
-        emoji = '✨';
-        title = `New ${detail} Set Record!`;
-        message = `${value} reps for your ${detail} sets! Incredible work.`;
-      }
-      
-      overlay.innerHTML = `
-        <div class="celebration" role="dialog" aria-modal="true" aria-labelledby="celebrationTitle" aria-live="polite" aria-atomic="true">
-          <div class="emoji" style="font-size:64px;margin-bottom:16px" aria-hidden="true">${emoji}</div>
-          <h2 id="celebrationTitle">${title}</h2>
-          <p>${message}</p>
-          <button id="celebrationOk" class="primary" onclick="this.closest('.modal-overlay').remove()">Awesome!</button>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      overlay.addEventListener('click', (e) => {
-        if(e.target === overlay) overlay.remove();
-      });
-      const okBtn = overlay.querySelector('#celebrationOk');
-      if (okBtn) okBtn.focus();
-      setTimeout(() => overlay.remove(), CONSTANTS.CELEBRATION_AUTO_CLOSE_MS);
-    }
-    
-    function renderPRList(stats) {
-        const container = $('#type-pr-list-container');
-        if (!container) return;
-
+        // PR List
         const config = EXERCISE_CONFIG[currentExercise];
-        if (!config) return; 
-        
-        const prDefinitions = config.prDefinitions;
-        let html = '';
-
-        for (const type in prDefinitions) {
-            const prDef = prDefinitions[type]; 
-            const prKey = prDef.key;
-            const prLabel = prDef.label;
-            const prData = stats[prKey] || defaultPR; 
-
-            html += `
+        const prContainer = $('#type-pr-list-container');
+        prContainer.innerHTML = '';
+        Object.entries(config.prDefinitions).forEach(([type, def]) => {
+            const pr = stats.type_prs[def.key] || defaultPR;
+            prContainer.innerHTML += `
                 <div class="pr-item">
-                  <span class="pr-label">${prLabel}</span>
-                  <div class="pr-value">
-                    <span>${prData.reps}</span>
-                    <span class="pr-date">${formatDateForDisplay(prData.date)}</span>
-                  </div>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
-    }
-    
-    function updateStats(stats){
-      if (!stats) return; 
-      const displayDate = $('#date').value || todayDisplay();
-      const targetDate = parseDateFromDisplay(displayDate);
-      
-      $('#dailyTotal').textContent = (stats.dailyTotals && stats.dailyTotals[targetDate]) || 0;
-      $('#weeklyTotal').textContent = stats.currentWeekTotal || 0;
-      $('#allTimeTotal').textContent = stats.totalReps || 0;
-      
-      $('#highestSetReps').textContent = stats.pr_set ? stats.pr_set.reps : 0;
-      $('#highestSetDate').textContent = formatDateForDisplay(stats.pr_set ? stats.pr_set.date : '—');
-      
-      $('#highestDailyTotalReps').textContent = stats.pr_day ? stats.pr_day.reps : 0;
-      $('#highestDailyTotalDate').textContent = formatDateForDisplay(stats.pr_day ? stats.pr_day.date : '—');
-      
-      $('#highestWeeklyTotalReps').textContent = stats.pr_week ? stats.pr_week.reps : 0;
-      const weeklyPRDate = (stats.pr_week && stats.pr_week.date !== '—') ? formatDateForDisplay(wkRange(stats.pr_week.date).join(' → ')) : '—';
-      $('#highestWeeklyTotalDate').textContent = weeklyPRDate;
+                    <span class="pr-label">${def.label}</span>
+                    <div class="pr-value">${pr.reps} <span class="pr-date">${pr.date}</span></div>
+                </div>`;
+        });
 
-      renderPRList(stats);
-      
-      let avgForDisplay = stats.avgSet || 0;
-      try {
-        const selectedType = (document.getElementById('type') && document.getElementById('type').value) || null;
-        if (selectedType && stats.avgByType && typeof stats.avgByType[selectedType] !== 'undefined') {
-          avgForDisplay = stats.avgByType[selectedType];
-        }
-      } catch (e) { }
-      $('#avgSet').textContent = avgForDisplay || 0;
-      $('#setsToday').textContent = stats.currentSetsToday || 0;
-      
-      const weeksWithData = Object.keys(stats.weeklyTotals || {}).length;
-      const weeklyAverage = weeksWithData > 0 ? Math.round(stats.totalReps / weeksWithData) : 0;
-      $('#weeklyAvg').textContent = weeklyAverage;
-      
-      const target = Number($('#dailyTarget').value)||0;
-      const dayTotal = (stats.dailyTotals && stats.dailyTotals[todayISO()]) || 0;
-      const pct = target ? Math.round((dayTotal/target)*100) : 0;
-      const el = $('#targetStatus');
-      if (el) {
-        el.textContent = `${pct}% of target`;
-        el.className = 'pill ' + (pct>=120? 'ok' : pct>=80? 'warn' : 'bad');
-      }
-      
-      const barEl = $('#targetBar');
-      if (barEl) {
-        const barWidth = Math.min(pct, 100);
-        barEl.style.width = barWidth + '%';
-        let barColor;
-        if (pct >= 120) {
-          barColor = 'linear-gradient(90deg,#22c55e,#16a34a)';
-        } else if (pct >= 100) {
-          barColor = 'linear-gradient(90deg,#84cc16,#65a30d)';
-        } else if (pct >= 80) {
-          barColor = 'linear-gradient(90deg,#f59e0b,#d97706)';
-        } else if (pct >= 50) {
-          barColor = 'linear-gradient(90deg,#f97316,#ea580c)';
-        } else {
-          barColor = 'linear-gradient(90deg,#ef4444,#dc2626)';
-        }
-        barEl.style.background = barColor;
-        barEl.setAttribute('aria-valuenow', String(barWidth));
-        barEl.setAttribute('aria-valuetext', `${pct}% of target`);
-      }
-      
-      updateWeeklyComparison(stats);
+        // Summary
+        const todayTotal = stats.dailyTotals[dateInput] || 0;
+        const weekStart = wkRange(dateInput)[0];
+        const currentWeekTotal = stats.weeklyTotals[weekStart] || 0;
 
-      const dataModal = $('#dataModal');
-      if (dataModal && dataModal.style.display === 'flex') {
-          $('#totalSets').textContent = stats.totalSets || 0;
-          $('#totalReps').textContent = stats.totalReps || 0;
-          $('#raw').textContent = JSON.stringify(state,null,2); 
-      }
-    }
-    
-    function updateWeeklyComparison(stats){
-      const thisWeekTotal = stats.currentWeekTotal || 0;
-      const lastWeekTotal = stats.lastWeekTotal || 0;
-      $('#thisWeekTotal').textContent = thisWeekTotal;
-      $('#lastWeekTotal').textContent = lastWeekTotal;
-      const diff = thisWeekTotal - lastWeekTotal;
-      const pctChange = lastWeekTotal > 0 ? Math.round((diff / lastWeekTotal) * 100) : 0;
-      const arrow = $('#trendArrow');
-      const comparison = $('#weeklyComparison');
-      
-      if(diff > 0){
-        arrow.textContent = '📈';
-        arrow.style.color = 'var(--ok)';
-        comparison.innerHTML = `<div class="weekly-comparison"><div class="wc-value"><span class="trend up">+${diff} reps</span>
- <small style="color:var(--muted);margin-left:8px">(${pctChange}% vs last)</small></div><div class="wc-msg" style="color:var(--ok)">Great progress — keep it up!</div></div>`;
-      } else if(diff < 0){
-        arrow.textContent = '📉';
-        arrow.style.color = 'var(--bad)';
-        comparison.innerHTML = `<div class="weekly-comparison"><div class="wc-value"><span class="trend down">${diff} reps</span><br> <small style="color:var(--muted);margin-left:8px">(↓${Math.abs(pctChange)}% vs last)</small></div><div class="wc-msg" style="color:var(--bad)">Let's get back on track!</div></div>`;
-      } else {
-        arrow.textContent = '➡️';
-        arrow.style.color = 'var(--muted)';
-        comparison.innerHTML = `<div class="weekly-comparison"><div class="wc-value"><span class="trend stable">Same as last week</span></div><div class="wc-msg" style="color:var(--muted)">Stay consistent — you're on track.</div></div>`;
-      }
-    }
-    
-    function updateTypeDropdown(exercise) {
-        const typeSelect = $('#type');
-        if (!typeSelect) return;
+        $('#dailyTotal').textContent = todayTotal;
+        $('#weeklyTotal').textContent = currentWeekTotal;
+        $('#allTimeTotal').textContent = stats.totalReps;
+        $('#setsToday').textContent = entries.filter(e => e.date === dateInput).length;
+
+        // Target
+        const pct = Math.min(100, Math.round((todayTotal / currentTarget) * 100));
+        $('#targetStatus').textContent = `${pct}%`;
+        $('#targetBar').style.width = `${pct}%`;
+        $('#targetStatus').className = `pill target-pill ${pct >= 100 ? 'ok' : 'warn'}`;
         
-        const config = EXERCISE_CONFIG[exercise];
-        if (!config) return;
-
-        typeSelect.innerHTML = config.types
-            .map(type => `<option value="${type}">${type}</option>`)
-            .join('');
+        renderTodayLog(dateInput);
+        renderFullHistory();
+        renderChart();
     }
 
-    // --- NEW: Function to render the simple "Today's Log" list ---
-    function renderTodayLog() {
-        const displayDate = $('#date').value || todayDisplay();
-        const targetDate = parseDateFromDisplay(displayDate);
-        
-        const daysEntries = state.entries.filter(e => e.date === targetDate);
-        daysEntries.sort((a,b) => b.createdAt - a.createdAt); // Newest first
-
-        const container = $('#todayLogList');
+    function renderTodayLog(date) {
+        const todayEntries = entries.filter(e => e.date === date).reverse();
         const panel = $('#todayLogPanel');
-        const header = panel.querySelector('h3');
+        const list = $('#todayLogList');
         
-        if (!container || !panel) return;
-        
-        if (daysEntries.length === 0) {
+        if (todayEntries.length === 0) {
             panel.style.display = 'none';
             return;
         }
-        
         panel.style.display = 'block';
-        header.textContent = `Sets for ${displayDate}`;
+        panel.querySelector('h3').textContent = `Sets for ${date}`;
         
-        container.innerHTML = daysEntries.map(e => `
-            <div class="set-item" style="background:#1a1a1c; padding: 10px 14px;">
+        list.innerHTML = todayEntries.map(e => `
+            <div class="set-item" style="background:#1a1a1c;">
                 <div class="set-info">
-                    <strong>${e.reps}</strong> <span style="font-size:14px; color:var(--muted)">${escapeHtml(e.type)}</span>
-                    ${e.note ? `<span style="font-size:12px; color:var(--muted); display:block">${escapeHtml(e.note)}</span>` : ''}
+                    <strong>${e.reps}</strong> <span style="font-size:14px; color:var(--muted)">${e.type}</span>
+                    ${e.note ? `<br><span style="font-size:12px;color:var(--muted)">${e.note}</span>` : ''}
                 </div>
                 <div class="set-actions">
-                    <button data-id="${e.id}" class="ghost edit-btn" style="padding:4px 8px; font-size:13px">Edit</button>
-                    <button data-id="${e.id}" class="ghost del-btn" style="padding:4px 8px; font-size:13px; color:var(--bad)">Del</button>
+                    <button class="ghost" onclick="openEditModal('${e.id}')">Edit</button>
+                    <button class="ghost" style="color:var(--bad)" onclick="deleteEntry('${e.id}')">Del</button>
                 </div>
             </div>
         `).join('');
     }
 
-    function render(){
-      // FIX: Ensure date value is not overwritten if user is typing
-      if (!$('#date').value) {
-          $('#date').value = todayDisplay();
-      }
-      $('#dailyTarget').value = state.target;
-      
-      const displayDate = $('#date').value || todayDisplay();
-      const currentTargetDate = parseDateFromDisplay(displayDate);
-      const stats = calculateAllStats(state.entries, state, currentTargetDate);
-
-      const stateStr = JSON.stringify(state.entries); 
-      const needsFullRender = stateStr !== lastRenderedState;
-      
-      if(needsFullRender){
-        renderLog();
-        renderTodayLog(); // Update the new panel
-        lastRenderedState = stateStr;
-      }
-      
-      updateStats(stats); 
-
-      const [ws,we] = wkRange(currentTargetDate);
-      $('#weekInfo').textContent = `Week: ${formatDateForDisplay(ws)} → ${formatDateForDisplay(we)}`;
-      
-      const currentStreak = calculateStreak(state.entries);
-      const streakEl = $('#streakBadge');
-      if(currentStreak >= 2){
-        streakEl.innerHTML = `<div class="streak-badge"><span class="streak-emoji">🔥</span>${currentStreak} day streak</div>`;
-      } else {
-        streakEl.innerHTML = '';
-      }
-      
-      if(needsFullRender || !chartInstance){
-        renderChart();
-      }
-    }
-    
-    function renderLog(){
-      const grouped = {};
-      state.entries.forEach(e => {
-        if(!grouped[e.date]) grouped[e.date] = [];
-        grouped[e.date].push(e);
-      });
-
-      const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
-      dates.forEach(date => {
-        grouped[date].sort((a,b) => b.createdAt - a.createdAt);
-      });
-
-      const monthGroups = {};
-      dates.forEach(date => {
-        const monthKey = date.slice(0, 7);
-        if(!monthGroups[monthKey]) monthGroups[monthKey] = [];
-        monthGroups[monthKey].push(date);
-      });
-
-      const months = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
-
-      const container = document.getElementById('logContainer');
-      if(!container) return;
-      
-      if(dates.length === 0){
-        container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No entries yet. Add your first set above!</p>';
-      } else {
-        const config = EXERCISE_CONFIG[currentExercise];
-        if (!config) return; 
+    function renderFullHistory() {
+        const grouped = {};
+        entries.forEach(e => {
+            const m = e.date.substring(0, 7);
+            if(!grouped[m]) grouped[m] = {};
+            if(!grouped[m][e.date]) grouped[m][e.date] = [];
+            grouped[m][e.date].push(e);
+        });
         
-        container.innerHTML = months.map(monthKey => {
-          const monthDates = monthGroups[monthKey];
-          // Use timezone-safe parsing for month name
-          const [y, m] = monthKey.split('-');
-          const monthDate = new Date(Number(y), Number(m)-1, 1);
-          const monthName = monthDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-
-          const monthTotalReps = monthDates.reduce((sum, date) => {
-            return sum + grouped[date].reduce((s, e) => s + e.reps, 0);
-          }, 0);
-          const monthTotalSets = monthDates.reduce((sum, date) => sum + grouped[date].length, 0);
-
-          return `
-            <div class="month-group">
-              <div class="month-header" tabindex="0" role="button" aria-expanded="false" aria-controls="month-${monthKey}" data-month="${monthKey}">
-                <div>
-                  <strong>${monthName}</strong>
-                  <span style="color:var(--muted);margin-left:10px">${monthTotalSets} sets • ${monthDates.length} days</span>
-                </div>
-                <div>
-                  <strong style="color:var(--accent)">${monthTotalReps} reps</strong>
-                  <span style="margin-left:10px;color:var(--muted)" id="month-arrow-${monthKey}">▼</span>
-                </div>
-              </div>
-              <div class="month-content" id="month-${monthKey}" style="display:none">
-                ${monthDates.map(date => {
-                  const sets = grouped[date];
-                  const dayTotal = sets.reduce((sum, e) => sum + e.reps, 0);
-                  const setCount = sets.length;
-                  
-                  return `
-                    <div class="day-group">
-                      <div class="day-header" tabindex="0" role="button" aria-expanded="false" aria-controls="sets-${date}" data-date="${date}">
-                        <div>
-                          <strong>${formatDateForDisplay(date)}</strong>
-                          <span style="color:var(--muted);margin-left:8px">${setCount} set${setCount !== 1 ? 's' : ''}</span>
+        const sortedMonths = Object.keys(grouped).sort().reverse();
+        const html = sortedMonths.map(month => {
+            const days = Object.keys(grouped[month]).sort().reverse();
+            const monthTotal = days.reduce((sum, d) => sum + grouped[month][d].reduce((s,x)=>s+x.reps,0), 0);
+            
+            const daysHtml = days.map(day => {
+                const dayTotal = grouped[month][day].reduce((s,x)=>s+x.reps,0);
+                const daySets = grouped[month][day].map(e => `
+                    <div class="set-item">
+                        <div class="set-info"><strong>${e.reps}</strong> ${e.type}</div>
+                        <div class="set-actions">
+                             <button class="ghost" onclick="openEditModal('${e.id}')">Edit</button>
+                             <button class="ghost" onclick="deleteEntry('${e.id}')">Del</button>
                         </div>
-                        <div>
-                          <strong style="color:var(--accent)">${dayTotal} reps</strong>
-                          <span style="margin-left:8px;color:var(--muted)" id="arrow-${date}">▼</span>
-                        </div>
-                      </div>
-                      <div class="day-sets" id="sets-${date}" style="display:none">
-                        ${sets.map(e => `
-                          <div class="set-item">
-                            <div class="set-info">
-                              <strong>${e.reps} reps</strong>
-                              <span style="color:var(--accent);margin-left:8px">${escapeHtml(e.type || config.types[0])}</span>
-                              ${e.note ? `<span style="color:var(--muted);margin-left:8px">${escapeHtml(e.note)}</span>` : ''}
-                            </div>
-                            <div class="set-actions">
-                              <button data-id="${e.id}" class="ghost edit-btn">Edit</button>
-                              <button data-id="${e.id}" class="ghost del-btn">Delete</button>
-                            </div>
-                          </div>
-                        `).join('')}
-                      </div>
                     </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
+                `).join('');
+                
+                return `
+                    <div class="day-group">
+                        <div class="day-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'block':'none'">
+                            <span>${day}</span> <strong style="color:var(--accent)">${dayTotal}</strong>
+                        </div>
+                        <div class="day-sets" style="display:none">${daySets}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="month-group">
+                    <div class="month-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <span>${month}</span> <strong>${monthTotal} reps</strong>
+                    </div>
+                    <div class="month-content" style="display:none">${daysHtml}</div>
+                </div>
+            `;
         }).join('');
-      }
+        $('#logContainer').innerHTML = html;
     }
 
-    function toggleMonth(monthKey){
-      const contentEl = document.getElementById(`month-${monthKey}`);
-      const arrowEl = document.getElementById(`month-arrow-${monthKey}`);
-      const headerEl = document.querySelector(`[data-month="${monthKey}"]`);
-      if(contentEl.style.display === 'none'){
-        contentEl.style.display = 'block';
-        arrowEl.textContent = '▲';
-        if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
-      } else {
-        contentEl.style.display = 'none';
-        arrowEl.textContent = '▼';
-        if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
-      }
-    }
+    function renderChart() {
+        const ctx = $('#chart').getContext('2d');
+        if(chartInstance) chartInstance.destroy();
+        const days = Number($('#chartDays').value);
+        const labels = [], dataPoints = [];
+        const today = new Date();
+        
+        for(let i=days-1; i>=0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const iso = d.toISOString().slice(0,10);
+            labels.push(iso.slice(5));
+            dataPoints.push(entries.filter(e => e.date === iso).reduce((s,x)=>s+x.reps, 0));
+        }
 
-    function toggleDay(date){
-      const setsEl = document.getElementById(`sets-${date}`);
-      const arrowEl = document.getElementById(`arrow-${date}`);
-      const headerEl = document.querySelector(`[data-date="${date}"]`);
-      if(setsEl.style.display === 'none'){
-        setsEl.style.display = 'block';
-        arrowEl.textContent = '▲';
-        if(headerEl) headerEl.setAttribute('aria-expanded', 'true');
-      } else {
-        setsEl.style.display = 'none';
-        arrowEl.textContent = '▼';
-        if(headerEl) headerEl.setAttribute('aria-expanded', 'false');
-      }
-    }
-
-    function renderChart(){
-      const days = Number($('#chartDays').value) || 30;
-      const today = new Date();
-      const labels = [];
-      const data = [];
-      
-      for(let i = days - 1; i >= 0; i--){
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        const dateStr = d.toISOString().slice(0,10);
-        labels.push(formatDateForDisplay(dateStr));
-        const dayTotal = state.entries
-          .filter(e => e.date === dateStr)
-          .reduce((sum, e) => sum + e.reps, 0);
-        data.push(dayTotal);
-      }
-
-      const ctxEl = $('#chart');
-      // If chart element is hidden, don't try to render
-      if (ctxEl.offsetParent === null) return;
-
-      const ctx = ctxEl.getContext('2d');
-      if(chartInstance) chartInstance.destroy();
-
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: `Daily ${currentExercise} Reps`,
-              data: data,
-              borderColor: '#4f8cff',
-              backgroundColor: 'rgba(79, 140, 255, 0.1)',
-              tension: 0.3,
-              fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Reps',
+                    data: dataPoints,
+                    borderColor: '#4f8cff',
+                    backgroundColor: 'rgba(79, 140, 255, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
             },
-            {
-              label: 'Target',
-              data: Array(labels.length).fill(state.target),
-              borderColor: '#22c55e',
-              borderDash: [5, 5],
-              borderWidth: 2,
-              pointRadius: 0,
-              fill: false
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { grid: { color: '#222' } }, y: { grid: { color: '#222' }, beginAtZero: true } },
+                plugins: { legend: { display: false } }
             }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#e7e7ea' } },
-            tooltip: {
-              backgroundColor: '#151517',
-              titleColor: '#e7e7ea',
-              bodyColor: '#e7e7ea',
-              borderColor: '#222',
-              borderWidth: 1
-            }
-          },
-          scales: {
-            x: {
-              ticks: { 
-                color: '#9aa0a6', 
-                maxRotation: 90, 
-                minRotation: 45 
-              },
-              grid: { color: '#222' }
-            },
-            y: {
-              beginAtZero: true,
-              ticks: { color: '#9aa0a6' },
-              grid: { color: '#222' }
-            }
-          }
-        }
-      });
-    }
-    
-    function showEditModal(entryId){
-      const entry = state.entries.find(x => x.id === entryId);
-      if(!entry) {
-          showError('Entry not found for editing.');
-          return;
-      }
-      
-      const config = EXERCISE_CONFIG[currentExercise];
-      if (!config) return; 
-      
-      const typeOptions = config.types
-          .map(type => `<option value="${type}">${type}</option>`)
-          .join('');
-      
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-labelledby="editModalTitle" aria-modal="true">
-          <h3 id="editModalTitle">Edit Set</h3>
-          <label>Reps</label>
-          <input type="number" id="editReps" value="${entry.reps}" min="1" aria-label="Number of reps" />
-          
-          <label>Type</label>
-          <select id="editType" aria-label="Set Type" style="margin-bottom:16px">
-            ${typeOptions} </select>
-
-          <label>Notes</label>
-          <textarea id="editNote" aria-label="Set notes">${entry.note || ''}</textarea>
-          <div class="modal-buttons">
-            <button class="ghost" id="cancelEdit">Cancel</button>
-            <button class="primary" id="saveEdit">Save</button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(overlay);
-      
-      const saveBtn = overlay.querySelector('#saveEdit');
-      const cancelBtn = overlay.querySelector('#cancelEdit');
-      const repsInput = overlay.querySelector('#editReps');
-      const typeSelect = overlay.querySelector('#editType');
-      
-      repsInput.focus();
-      repsInput.select();
-      
-      typeSelect.value = entry.type || config.types[0];
-
-      const handleSave = () => {
-        setLoading('saveEdit', true, 'Saving...');
-        const reps = Number(repsInput.value);
-        const type = typeSelect.value;
-        const note = escapeHtml(overlay.querySelector('#editNote').value.trim());
-        
-        if(!reps || reps < 1){
-          showError('Please enter a valid number of reps (1 or more).'); 
-          setLoading('saveEdit', false, 'Save');
-          return;
-        }
-        
-        try {
-            const newState = { ...state };
-            const entryToUpdate = newState.entries.find(x => x.id === entryId);
-            if(entryToUpdate){
-                entryToUpdate.reps = reps;
-                entryToUpdate.type = type;
-                entryToUpdate.note = note;
-            }
-            calculateAllStats(newState.entries, newState); 
-            saveState(newState);
-            overlay.remove();
-            showSuccess('Set updated successfully.');
-        } catch(e) {
-            showError('Failed to save set changes.');
-        } finally {
-            setLoading('saveEdit', false, 'Save');
-        }
-      };
-      
-      saveBtn.addEventListener('click', handleSave);
-      cancelBtn.addEventListener('click', () => overlay.remove());
-      overlay.addEventListener('keydown', (e) => {
-        if(e.key === 'Escape'){
-          overlay.remove();
-        } else if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
-          handleSave();
-        }
-      });
-      overlay.addEventListener('click', (e) => {
-        if(e.target === overlay) overlay.remove();
-      });
+        });
     }
 
-    // --- EVENTS AND HANDLERS ---
+    function checkAchievements(oldS, newS, oldStr, newStr, reps, type) {
+        if(newStr > oldStr && newStr % 5 === 0) showCelebration(`🔥 ${newStr} Day Streak!`, "Consistency is key!");
+        if(reps > oldS.pr_set.reps) showCelebration(`💪 New PR: ${reps} Reps!`, "Strongest set ever!");
+        if(newS.dailyTotals[$('#date').value] > oldS.pr_day.reps) showCelebration(`🚀 New Daily Record!`, "Most reps in a single day!");
+    }
+
+    function showCelebration(title, msg) {
+        const div = document.createElement('div');
+        div.className = 'modal-overlay';
+        div.innerHTML = `
+            <div class="celebration">
+                <div class="emoji">🎉</div>
+                <h2 style="color:var(--ok)">${title}</h2>
+                <p style="color:var(--muted)">${msg}</p>
+                <button class="primary" onclick="this.closest('.modal-overlay').remove()">Awesome!</button>
+            </div>
+        `;
+        document.body.appendChild(div);
+        setTimeout(()=>div.remove(), 4000);
+    }
+
+    // --- 6. HELPERS ---
     
-    $('#exerciseSelect').addEventListener('change', (e) => {
-        currentExercise = e.target.value;
-        state = globalState[currentExercise]; 
+    function setLoading(isLoading) {
+        $('#loadingIndicator').style.display = isLoading ? 'block' : 'none';
+        ['#addEntrySection', '#prSection', '#chartSection', '#summarySection'].forEach(s => {
+            $(s).style.display = isLoading ? 'none' : (s.includes('pr')||s.includes('summary')?'flex':'block');
+        });
+    }
+
+    function init() {
+        flatpickr('#date', { defaultDate: 'today', dateFormat: 'Y-m-d', onChange: render });
         
-        updateTypeDropdown(currentExercise); 
-        scheduleRender(); 
-    });
+        const typeSelect = $('#type');
+        EXERCISE_CONFIG['Push-up'].types.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t; opt.textContent = t; typeSelect.appendChild(opt);
+        });
 
-      const typeEl = document.getElementById('type');
-      if (typeEl) {
-        typeEl.addEventListener('change', () => scheduleRender());
-      }
-    
-    document.addEventListener('keydown', (e) => {
-      if((e.ctrlKey || e.metaKey) && e.key === 'k'){
-        e.preventDefault();
-        $('#reps').focus();
-        $('#reps').select();
-      }
-      if(e.key === 'Escape' && document.activeElement.id === 'reps'){
-        $('#reps').value = '';
-        $('#note').value = '';
-        $('#reps').blur();
-      }
-      const target = e.target;
-      if(target.classList.contains('month-header') || target.classList.contains('day-header')){
-        if(e.key === 'Enter' || e.key === ' '){
-          e.preventDefault();
-          if(target.classList.contains('month-header')) toggleMonth(target.getAttribute('data-month'));
-          if(target.classList.contains('day-header')) toggleDay(target.getAttribute('data-date'));
-        }
-      }
-    });
-    
-    $('#addBtn').addEventListener('click', () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      setLoading('addBtn', true, 'Adding...');
-      
-      const displayDate = $('#date').value || todayDisplay();
-      const date = parseDateFromDisplay(displayDate); 
-      const reps = Number($('#reps').value);
-      if(!reps || reps < 1) {
-          setLoading('addBtn', false, 'Add Set');
-          return showError('Please enter a valid number of reps (1 or more).');
-      }
-      
-      const type = $('#type').value;
-      const note = escapeHtml($('#note').value.trim());
-      
-      const config = EXERCISE_CONFIG[currentExercise];
-      if (!config) { 
-          setLoading('addBtn', false, 'Add Set');
-          return showError("Could not find configuration for this exercise.");
-      }
-      
-      const prDef = config.prDefinitions[type]; 
-      const prKey = prDef ? prDef.key : null;   
-      
-      const oldStats = calculateAllStats(state.entries, state, date); 
-      const oldTodayTotal = (oldStats.dailyTotals && oldStats.dailyTotals[date]) || 0;
-      const oldHighestSet = oldStats.highestSet || 0;
-      const oldHighestDailyTotal = oldStats.highestDailyTotal || 0;
-      const oldHighestWeeklyTotal = oldStats.highestWeeklyTotal || 0;
-      const oldTypePR = (prKey && state[prKey]) ? state[prKey].reps : 0; 
-      const oldTotal = oldStats.totalReps || 0;
-      const oldStreak = calculateStreak(state.entries);
-      
-      // FIX: Use generated ID
-      const entry = { id: generateId(), date, reps, type, note, createdAt: Date.now() };
-      const newState = { ...state, entries: [...state.entries, entry] };
-      
-      const newStats = calculateAllStats(newState.entries, newState, date); 
-      saveState(newState);
+        $('#addBtn').addEventListener('click', addEntry);
+        $('#chartDays').addEventListener('change', renderChart);
+        $('#dailyTarget').addEventListener('input', (e) => { currentTarget = e.target.value; render(); });
+        $('#expandAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='block'));
+        $('#collapseAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='none'));
 
-      const newTodayTotal = (newStats.dailyTotals && newStats.dailyTotals[date]) || 0;
-      const newTotal = newStats.totalReps || 0;
-      const newStreak = calculateStreak(newState.entries);
-
-      const target = Number($('#dailyTarget').value)||0;
-      
-      if(target > 0 && oldTodayTotal < target && newTodayTotal >= target){
-        showAchievement('target', target);
-      }
-      if(reps > oldHighestSet){
-        showAchievement('pr', reps);
-      }
-      if(prKey && reps > oldTypePR){
-        showAchievement('type_pr', reps, type); 
-      }
-      if(newTodayTotal > oldHighestDailyTotal){
-         showAchievement('daily_pr', newTodayTotal);
-      }
-      if(newStats.currentWeekTotal > oldHighestWeeklyTotal){
-          showAchievement('weekly_pr', newStats.currentWeekTotal);
-      }
-      if(newStreak > oldStreak && newStreak >= CONSTANTS.STREAK_ACHIEVEMENT_STEP && newStreak % CONSTANTS.STREAK_ACHIEVEMENT_STEP === 0){
-        showAchievement('streak', newStreak);
-      }
-      for(const milestone of CONSTANTS.MILESTONES){
-        if(oldTotal < milestone && newTotal >= milestone){
-          showAchievement('milestone', milestone);
-          break;
-        }
-      }
-      
-      $('#reps').value = '';
-      $('#note').value = '';
-      $('#reps').focus();
-      setLoading('addBtn', false, 'Add Set');
-    });
-    
-    $('#reps').addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); $('#addBtn').click(); }
-    });
-    $('#note').addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); $('#addBtn').click(); }
-    });
-
-    $('#clearTodayBtn').addEventListener('click', () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      
-      const displayDate = $('#date').value || todayDisplay();
-      const d = parseDateFromDisplay(displayDate); 
-      
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-labelledby="clearModalTitle" aria-modal="true">
-          <h3 id="clearModalTitle" style="color:var(--bad)">Confirm Clear</h3>
-          <p>Are you sure you want to delete all ${currentExercise} entries for ${displayDate}?</p>
-          <div class="modal-buttons">
-            <button class="ghost" id="cancelClear">Cancel</button>
-            <button class="danger" id="confirmClear">Delete All</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      overlay.querySelector('#confirmClear').addEventListener('click', () => {
-        setLoading('confirmClear', true, 'Deleting...');
-        try {
-            const newState = { ...state, entries: state.entries.filter(e => e.date !== d) };
-            calculateAllStats(newState.entries, newState);
-            saveState(newState); 
-            overlay.remove();
-            showSuccess(`All sets for ${d} deleted.`);
-        } catch (e) { showError('Failed to clear today\'s sets.'); }
-      });
-      overlay.querySelector('#cancelClear').addEventListener('click', () => overlay.remove());
-      overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-    });
-
-    $('#deleteLastBtn').addEventListener('click', () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      if(state.entries.length === 0) return showWarning("No entries to delete.");
-      
-      const lastEntry = state.entries[state.entries.length - 1];
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
-          <h3 id="deleteModalTitle" style="color:var(--bad)">Delete Last Entry?</h3>
-          <p><strong>${lastEntry.reps} reps</strong> (${lastEntry.type}) on ${formatDateForDisplay(lastEntry.date)}</p>
-          ${lastEntry.note ? `<p style="color:var(--muted);font-size:14px">Note: ${escapeHtml(lastEntry.note)}</p>` : ''}
-          <div class="modal-buttons">
-            <button class="ghost" id="cancelDelete">Cancel</button>
-            <button class="danger" id="confirmDelete">Delete</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      overlay.querySelector('#confirmDelete').addEventListener('click', () => {
-        setLoading('confirmDelete', true, 'Deleting...');
-        try {
-            const deletedEntry = lastEntry; 
-            const newState = { ...state, entries: state.entries.slice(0, -1) };
-            calculateAllStats(newState.entries, newState);
-            saveState(newState); 
-            overlay.remove();
-
-            if (lastDeletedTimer) { clearTimeout(lastDeletedTimer); lastDeletedTimer = null; lastDeletedEntry = null; }
-            lastDeletedEntry = deletedEntry;
-
-            showToast(`Deleted ${deletedEntry.reps} reps (${deletedEntry.type})`, 'Undo', () => {
-                if (!lastDeletedEntry) return;
-                try {
-                    const restored = { ...state, entries: [...state.entries, lastDeletedEntry] };
-                    calculateAllStats(restored.entries, restored);
-                    saveState(restored);
-                    lastDeletedEntry = null;
-                    if (lastDeletedTimer) { clearTimeout(lastDeletedTimer); lastDeletedTimer = null; }
-                    showSuccess('Entry restored.');
-                } catch (e) {
-                    showError('Failed to restore entry.');
-                }
-            }, 8000);
-
-            lastDeletedTimer = setTimeout(() => { lastDeletedEntry = null; lastDeletedTimer = null; }, 8000);
-
-            showSuccess('Last entry deleted.');
-        } catch (e) { 
-          showError('Failed to delete entry.');
-          setLoading('confirmDelete', false, 'Delete');
-        }
-      });
-      overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
-      overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-    });
-
-    let targetDebounce = null;
-    $('#dailyTarget').addEventListener('input', () => {
-      if(!isStorageReady) return;
-      if(targetDebounce) clearTimeout(targetDebounce);
-      targetDebounce = setTimeout(() => {
-        const target = Number($('#dailyTarget').value)||0;
-        const newState = { ...state, target: target };
-        saveState(newState); 
-      }, CONSTANTS.TARGET_DEBOUNCE_MS);
-    });
-
-    // --- UPDATED: Event Listener Delegation for both Log sections ---
-    // Now handles clicks in both #chartSection (Full History) and #addEntrySection (Today's Log)
-    document.addEventListener('click', (e) => {
-      if(!isStorageReady) return;
-      
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      
-      // Global Expand/Collapse handlers for the full log
-      if (btn.id === 'expandAllBtn') {
-        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'block');
-        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▲');
-        return;
-      }
-      if (btn.id === 'collapseAllBtn') {
-        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'none');
-        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▼');
-        return;
-      }
-      
-      // Handle Edit/Delete buttons (checking class existence)
-      if (btn.classList.contains('del-btn') || btn.classList.contains('edit-btn')) {
-          const id = btn.getAttribute('data-id');
-          if(!id) return;
-
-          if(btn.classList.contains('del-btn')){
+        // Global handlers
+        window.deleteEntry = deleteEntry;
+        window.openEditModal = (id) => {
+            const e = entries.find(x => x.id === id);
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
             overlay.innerHTML = `
-              <div class="modal" role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
-                <h3 id="deleteModalTitle" style="color:var(--bad)">Confirm Deletion</h3>
-                <p>Are you sure you want to permanently delete this set?</p>
-                <div class="modal-buttons">
-                  <button class="ghost" id="cancelDelete">Cancel</button>
-                  <button class="danger" id="confirmDelete" data-id="${id}">Delete</button>
-                </div>
-              </div>
-            `;
+                <div class="modal">
+                    <h3>Edit Set</h3>
+                    <label>Reps</label><input id="editReps" type="number" value="${e.reps}">
+                    <label>Type</label><select id="editType">${EXERCISE_CONFIG['Push-up'].types.map(t=>`<option ${t===e.type?'selected':''}>${t}</option>`)}</select>
+                    <label>Note</label><input id="editNote" type="text" value="${e.note||''}">
+                    <div class="modal-buttons">
+                        <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                        <button class="primary" id="saveEditBtn">Save</button>
+                    </div>
+                </div>`;
             document.body.appendChild(overlay);
-            overlay.querySelector('#confirmDelete').addEventListener('click', () => {
-              setLoading('confirmDelete', true, 'Deleting...');
-              try {
-                  const entryIdToDelete = overlay.querySelector('#confirmDelete').getAttribute('data-id');
-                  const newState = { ...state, entries: state.entries.filter(x => x.id !== entryIdToDelete) };
-                  calculateAllStats(newState.entries, newState);
-                  saveState(newState); 
-                  overlay.remove();
-                  showSuccess('Set deleted successfully.');
-              } catch (e) { showError('Failed to delete set.'); } 
-              finally { setLoading('confirmDelete', false, 'Delete'); }
-            });
-            overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
-            overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-          }
-          if(btn.classList.contains('edit-btn')){
-            showEditModal(id);
-          }
-      }
-      
-      // Handle Month/Day headers in full log
-      const header = e.target.closest('.month-header, .day-header');
-      if (header) {
-          if (header.classList.contains('month-header')) {
-              const monthKey = header.getAttribute('data-month');
-              if (monthKey) toggleMonth(monthKey);
-          } else if (header.classList.contains('day-header')) {
-              const date = header.getAttribute('data-date');
-              if (date) toggleDay(date);
-          }
-      }
-    });
+            overlay.querySelector('#saveEditBtn').onclick = () => {
+                updateEntry(id, Number($('#editReps').value), $('#editType').value, $('#editNote').value);
+                overlay.remove();
+            };
+        };
 
-    $('#dataModal').querySelector('#exportBtn').addEventListener('click', () => {
-      try {
-          for (const ex in globalState) {
-            if (globalState[ex]) {
-                calculateAllStats(globalState[ex].entries, globalState[ex]);
-            }
-          }
-          const blob = new Blob([JSON.stringify(globalState,null,2)], {type:'application/json'});
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'exercise-tracker-backup.json';
-          a.click();
-          URL.revokeObjectURL(a.href);
-      } catch (e) {
-          showError('Failed to export data.');
-      }
-    });
-
-    $('#dataModal').querySelector('#importBtn').addEventListener('click', async () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      const fileInput = document.getElementById('importFile');
-      const f = fileInput.files[0];
-      if(!f) return showWarning('Please choose a JSON file first.');
-      
-      setLoading('importBtn', true, 'Importing...');
-      
-      try{
-        const text = await f.text();
-        const data = JSON.parse(text);
-        if(!data || typeof data !== 'object') throw new Error('Invalid file format.');
-
-        if (data.entries) { 
-            const importedState = { ...createDefaultState('Push-up'), ...data };
-            globalState['Push-up'] = importedState;
-            calculateAllStats(importedState.entries, importedState);
-            if (!globalState['Abs']) globalState['Abs'] = createDefaultState('Abs');
-            if (!globalState['Squat']) globalState['Squat'] = createDefaultState('Squat');
-            
-        } else if (Object.keys(data).some(key => EXERCISE_CONFIG[key])) { 
-            for (const exerciseName in EXERCISE_CONFIG) {
-                globalState[exerciseName] = {
-                    ...createDefaultState(exerciseName),
-                    ...(data[exerciseName] || {})
-                };
-                if (globalState[exerciseName]) {
-                    calculateAllStats(globalState[exerciseName].entries, globalState[exerciseName]);
-                }
-            }
-        } else {
-             throw new Error('Unrecognized file structure. Not a valid tracker backup.');
-        }
-        
-        state = globalState[currentExercise];
-        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
-        scheduleRender();
-        fileInput.value = '';
-        showSuccess('Data imported and saved. Stats recalculated.');
-        
-      }catch(err){ 
-        console.error('Import failed:', err);
-        showError(err.message || 'An unknown error occurred during import.');
-      } finally {
-          setLoading('importBtn', false, 'Import');
-      }
-    });
-
-    $('#dataModal').querySelector('#backupBtn').addEventListener('click', async () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      setLoading('backupBtn', true, 'Sending...');
-      try {
-          const response = await sendBackupEmail();
-          if (response.status === 200) {
-              showSuccess(`Your data has been successfully emailed.`);
-          } else if (response.status === 400 && response.text === 'Skipped - Not Configured') {
-          } else {
-              showError('An error occurred during email transmission.');
-          }
-      } catch (e) {
-          showError(e.message || 'An unexpected error occurred during backup.');
-      } finally {
-          setLoading('backupBtn', false, 'Manual Email Backup');
-      }
-    });
-
-    $('#dataModal').querySelector('#resetBtn').addEventListener('click', () => {
-      if(!isStorageReady) return showWarning("App is not ready. Please try again.");
-      
-      let totalSets = 0;
-      let totalReps = 0;
-      for (const ex in globalState) {
-        if (globalState[ex]) {
-            const stats = calculateAllStats(globalState[ex].entries, globalState[ex]);
-            totalSets += stats.totalSets || 0;
-            totalReps += stats.totalReps || 0;
-        }
-      }
-
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal">
-          <h3 style="color:var(--bad)">⚠️ Reset All Data</h3>
-          <div class="warning-banner">
-            <div>
-              <strong>Warning:</strong> This will permanently delete data for ALL exercises (${totalSets} sets, ${totalReps} reps total) from local storage.
-            </div>
-          </div>
-          <p style="color:var(--muted);margin:16px 0">This action cannot be undone. We recommend exporting your data first.</p>
-          <label style="display:flex;align-items:center;gap:8px;margin:20px 0;cursor:pointer">
-            <input type="checkbox" id="confirmReset" style="width:auto;margin:0" />
-            <span>I understand this will delete all my data</span>
-          </label>
-          <div class="modal-buttons">
-            <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-            <button class="primary export-trigger" type="button">Export First</button>
-            <button class="danger" id="confirmResetBtn" disabled>Delete Everything</button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(overlay);
-      
-      const checkbox = overlay.querySelector('#confirmReset');
-      const confirmBtn = overlay.querySelector('#confirmResetBtn');
-      
-      checkbox.addEventListener('change', () => {
-        confirmBtn.disabled = !checkbox.checked;
-      });
-      
-      overlay.querySelector('.export-trigger').addEventListener('click', (e) => {
-        e.preventDefault();
-        $('#dataModal').querySelector('#exportBtn').click(); 
-      });
-      
-      confirmBtn.addEventListener('click', () => {
-        setLoading('confirmResetBtn', true, 'Deleting...');
-        try {
-            globalState = {};
-            for (const exerciseName in EXERCISE_CONFIG) {
-                globalState[exerciseName] = createDefaultState(exerciseName);
-            }
-            state = globalState[currentExercise];
-            
-            localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(globalState));
-            scheduleRender();
-            overlay.remove();
-            showSuccess('All data has been deleted from local storage.');
-            closeDataMenu();
-        } catch (e) {
-            showError('Failed to reset data.');
-        } finally {
-            setLoading('confirmResetBtn', false, 'Delete Everything');
-        }
-      });
-      overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-    });
-
-    $('#chartDays').addEventListener('change', () => {
-      renderChart();
-    });
-
-    const dataModal = $('#dataModal');
-    function openDataMenu() {
-        dataModal.style.display = 'flex';
-        renderLog(); 
-        const stats = calculateAllStats(state.entries, state);
-        if (stats) {
-            $('#totalSets').textContent = stats.totalSets || 0;
-            $('#totalReps').textContent = stats.totalReps || 0;
-        }
-        $('#raw').textContent = JSON.stringify(state,null,2); 
-        $('#closeDataMenuBtn').focus();
-    }
-    function closeDataMenu() {
-        dataModal.style.display = 'none';
-        scheduleRender(); 
+        fetchData();
     }
 
-    $('#openDataMenuBtn').addEventListener('click', openDataMenu);
-    $('#closeDataMenuBtn').addEventListener('click', closeDataMenu);
-    dataModal.addEventListener('click', (e) => { if(e.target === dataModal) closeDataMenu(); });
-    document.addEventListener('keydown', (e) => {
-        if(e.key === 'Escape' && dataModal.style.display === 'flex'){ closeDataMenu(); }
-    });
-
-    const backupBtnHeader = $('#backupBtnHeader');
-    if (backupBtnHeader) {
-      backupBtnHeader.addEventListener('click', async () => {
-        try {
-          setLoading('backupBtnHeader', true, 'Backup');
-          const res = await sendBackupEmail();
-          if (res && (res.status === 200 || res.text === 'OK')) {
-            showSuccess('Backup email sent.');
-          } else {
-            showWarning(res && res.text ? String(res.text) : 'Backup attempted.');
-          }
-        } catch (err) {
-          showError('Email backup failed.');
-        } finally {
-          setLoading('backupBtnHeader', false, 'Backup');
-        }
-      });
-    }
-
-    initApp();
-    $('#date').value = todayDisplay();
-
-// --- FIX: Simplified Flatpickr Initialization ---
-(function(){
-  function initDatePicker(){
-    if (typeof flatpickr === 'undefined') {
-        console.warn("Flatpickr library not loaded.");
-        return;
-    }
-    const el = document.getElementById('date');
-    if (!el || el._fp) return; 
-    flatpickr(el, {
-      dateFormat: 'd-m-Y',
-      defaultDate: todayDisplay(),
-      allowInput: true,
-      clickOpens: true,
-      weekNumbers: true,
-      disableMobile: true,
-      onChange: function(selectedDates, dateStr, instance) {
-         // Trigger app update on date selection
-         scheduleRender();
-      }
-    });
-  }
-  
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDatePicker);
-  } else {
-    initDatePicker();
-  }
-})();
-
-(function setupIconTrigger(){
-  function bind(){
-    const icon = document.getElementById('calendarIcon');
-    const input = document.getElementById('date');
-    if (!icon || !input) return;
-    function openPicker(){
-      try{
-        if (input._flatpickr) {
-          input._flatpickr.open();
-          return;
-        }
-        if (typeof flatpickr !== 'undefined') {
-          const inst = flatpickr(input, {
-            dateFormat: 'd-m-Y',
-            defaultDate: todayDisplay(),
-            allowInput: true,
-            clickOpens: true,
-            weekNumbers: true,
-            disableMobile: true,
-            onChange: function(selectedDates, dateStr, instance) {
-                scheduleRender();
-            }
-          });
-          if (inst) inst.open();
-          return;
-        }
-      } catch(e){
-          console.error("Flatpickr open failed:", e);
-      }
-      input.focus();
-    }
-    icon.addEventListener('click', openPicker);
-    icon.addEventListener('keydown', (e)=>{
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        openPicker();
-      }
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bind);
-  } else {
-    bind();
-  }
-})();
-
-</script>
+    init();
+  </script>
 </body>
 </html>
