@@ -6,7 +6,7 @@
   <title>Exercise Tracker (Cloud)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0b0c'/%3E%3Crect x='8' y='30' width='48' height='8' rx='4' fill='%23f97316'/%3E%3Ccircle cx='20' cy='24' r='6' fill='%23fbbf24'/%3E%3C/svg%3E">
   <style>
-    /* --- CSS STYLES (Identical to your preferred design) --- */
+    /* --- CSS STYLES --- */
     :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     html,body{height:100%}
     body{margin:0;font:18px "Century Gothic", CenturyGothic, AppleGothic, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column}
@@ -260,7 +260,6 @@
   
   <script type="module">
     // --- 1. SUPABASE CREDENTIALS ---
-    // PASTE YOUR KEYS HERE
     const SUPABASE_URL = 'https://rwfzdnprseuizzgygeow.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3ZnpkbnByc2V1aXp6Z3lnZW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMDUzMDksImV4cCI6MjA4MTU4MTMwOX0.K00q1xtHtC4piuacViSqlAOV26xtPRqshcTxFsGBDKk';
     
@@ -281,14 +280,22 @@
         'Abs': { 
             types: ['Ab Wheel', 'Sit-up Secured', 'Plank (seconds)', 'Russian Twists', 'Scissors'], 
             prDefinitions: { 'Ab Wheel': { key: 'pr_abwheel', label: 'Max Ab Wheel' } },
-            defaultTarget: 20
+            defaultTarget: 50
         },
-        'Squat': { types: ['Bodyweight', 'Goblet Squat', 'Back Squat'], prDefinitions: {}, defaultTarget: 50 },
-        'Crab/Bear Walk': { types: ['Crab Walk', 'Bear Walk'], prDefinitions: {}, defaultTarget: 60 }
+        'Squat': { 
+            types: ['Bodyweight', 'Goblet Squat', 'Back Squat'], 
+            prDefinitions: { 'Back Squat': { key: 'pr_backsquat', label: 'Max Back Squat'} }, 
+            defaultTarget: 50 
+        },
+        'Crab/Bear Walk': { 
+            types: ['Crab Walk', 'Bear Walk'], 
+            prDefinitions: {}, 
+            defaultTarget: 60 
+        }
     };
     
     let currentExercise = 'Push-up';
-    let entries = [];
+    let allEntries = []; // Holds EVERYTHING
     let chartInstance = null;
     let currentTarget = 30;
     const defaultPR = { reps: 0, date: '—' };
@@ -299,14 +306,26 @@
 
     async function fetchData() {
         setLoading(true);
-        // Fetch everything, sort by date
         const { data, error } = await supabase.from('pushup_logs').select('*').order('created_at', { ascending: true });
         
         if (error) {
             console.error(error);
             alert('Cloud Error: ' + error.message);
         } else {
-            entries = data || [];
+            allEntries = data || [];
+            
+            // --- AUTO-FIX LEGACY DATA ---
+            // If exercise is null, look at the "Type" to guess the Exercise
+            allEntries.forEach(e => {
+                if(!e.exercise) {
+                    // Try to find which exercise this type belongs to
+                    const foundExercise = Object.keys(EXERCISE_CONFIG).find(exName => 
+                        EXERCISE_CONFIG[exName].types.includes(e.type)
+                    );
+                    e.exercise = foundExercise || 'Push-up'; // Fallback to Push-up if unknown
+                }
+            });
+
             render();
         }
         setLoading(false);
@@ -320,24 +339,26 @@
         
         if(!reps || reps < 1) return alert("Please enter valid reps");
 
-        // Optimistic UI: Calculate stats BEFORE save to check for achievements
-        const oldStats = calculateAllStats(entries);
-        const oldStreak = calculateStreak(entries);
+        // Filter for calculation context
+        const currentFiltered = allEntries.filter(e => e.exercise === currentExercise);
+        const oldStats = calculateAllStats(currentFiltered);
+        const oldStreak = calculateStreak(currentFiltered);
 
-        // Save to Supabase
+        // SAVE TO SUPABASE
         const { data, error } = await supabase
             .from('pushup_logs')
-            .insert([{ date, reps, type, note }])
+            .insert([{ date, reps, type, note, exercise: currentExercise }])
             .select();
 
         if (error) {
             alert('Error saving: ' + error.message);
         } else if (data && data.length) {
-            entries.push(data[0]);
+            allEntries.push(data[0]);
             
             // Check Achievements
-            const newStats = calculateAllStats(entries);
-            const newStreak = calculateStreak(entries);
+            const newFiltered = allEntries.filter(e => e.exercise === currentExercise);
+            const newStats = calculateAllStats(newFiltered);
+            const newStreak = calculateStreak(newFiltered);
             
             checkAchievements(oldStats, newStats, oldStreak, newStreak, reps, type);
             
@@ -351,21 +372,25 @@
         if(!confirm("Delete this set?")) return;
         const { error } = await supabase.from('pushup_logs').delete().eq('id', id);
         if(!error) {
-            entries = entries.filter(e => e.id !== id);
+            allEntries = allEntries.filter(e => e.id !== id);
             render();
         } else {
             alert(error.message);
         }
     }
 
-    async function updateEntry(id, newReps, newType, newNote) {
-        const { error } = await supabase.from('pushup_logs').update({ reps: newReps, type: newType, note: newNote }).eq('id', id);
+    async function updateEntry(id, newReps, newType, newNote, newExercise) {
+        const { error } = await supabase.from('pushup_logs')
+            .update({ reps: newReps, type: newType, note: newNote, exercise: newExercise })
+            .eq('id', id);
+
         if(!error) {
-            const idx = entries.findIndex(e => e.id === id);
+            const idx = allEntries.findIndex(e => e.id === id);
             if(idx !== -1) {
-                entries[idx].reps = newReps;
-                entries[idx].type = newType;
-                entries[idx].note = newNote;
+                allEntries[idx].reps = newReps;
+                allEntries[idx].type = newType;
+                allEntries[idx].note = newNote;
+                allEntries[idx].exercise = newExercise;
             }
             render();
         } else {
@@ -373,7 +398,7 @@
         }
     }
 
-    // --- 4. CALCULATIONS (Returned from original code) ---
+    // --- 4. CALCULATIONS ---
 
     function calculateStreak(data) {
         if(data.length === 0) return 0;
@@ -382,20 +407,17 @@
         let streak = 0;
         let checkDate = today;
 
-        // Check if today is logged, if not, check yesterday
         if(uniqueDates[0] === today) {
             streak = 1;
             checkDate = prevDay(today);
         } else if (uniqueDates[0] === prevDay(today)) {
-             checkDate = prevDay(today); // Start counting from yesterday
+             checkDate = prevDay(today); 
         } else {
-            return 0; // Streak broken
+            return 0; 
         }
         
         for(let i=0; i<uniqueDates.length; i++) {
-             // If we already counted today, skip logic
              if (uniqueDates[i] === new Date().toISOString().slice(0,10) && streak === 1) continue;
-             
              if (uniqueDates[i] === checkDate) {
                  if(uniqueDates[i] !== new Date().toISOString().slice(0,10)) streak++;
                  checkDate = prevDay(checkDate);
@@ -451,7 +473,6 @@
             stats.weeklyTotals[weekKey] = (stats.weeklyTotals[weekKey] || 0) + e.reps;
         });
 
-        // Max Day/Week
         for (const [d, t] of Object.entries(stats.dailyTotals)) {
             if (t > stats.pr_day.reps) stats.pr_day = { reps: t, date: d };
         }
@@ -466,11 +487,16 @@
 
     function render() {
         const dateInput = $('#date').value || new Date().toISOString().slice(0,10);
-        const stats = calculateAllStats(entries);
         
-        // Streak
-        const streak = calculateStreak(entries);
+        // Filter entries based on currentExercise
+        const filteredEntries = allEntries.filter(e => e.exercise === currentExercise);
+
+        const stats = calculateAllStats(filteredEntries);
+        const streak = calculateStreak(filteredEntries);
+
+        // Update Headers & Targets
         $('#streakBadge').innerHTML = streak > 1 ? `<div class="streak-badge">🔥 ${streak} day streak</div>` : '';
+        $('#addEntrySection label[for="exerciseSelect"]').textContent = `Exercise: ${currentExercise}`;
 
         // Stats
         $('#highestSet').innerHTML = `${stats.pr_set.reps} <span class="pr-date">${stats.pr_set.date}</span>`;
@@ -481,14 +507,16 @@
         const config = EXERCISE_CONFIG[currentExercise];
         const prContainer = $('#type-pr-list-container');
         prContainer.innerHTML = '';
-        Object.entries(config.prDefinitions).forEach(([type, def]) => {
-            const pr = stats.type_prs[def.key] || defaultPR;
-            prContainer.innerHTML += `
-                <div class="pr-item">
-                    <span class="pr-label">${def.label}</span>
-                    <div class="pr-value">${pr.reps} <span class="pr-date">${pr.date}</span></div>
-                </div>`;
-        });
+        if(config.prDefinitions) {
+            Object.entries(config.prDefinitions).forEach(([type, def]) => {
+                const pr = stats.type_prs[def.key] || defaultPR;
+                prContainer.innerHTML += `
+                    <div class="pr-item">
+                        <span class="pr-label">${def.label}</span>
+                        <div class="pr-value">${pr.reps} <span class="pr-date">${pr.date}</span></div>
+                    </div>`;
+            });
+        }
 
         // Summary
         const todayTotal = stats.dailyTotals[dateInput] || 0;
@@ -498,7 +526,10 @@
         $('#dailyTotal').textContent = todayTotal;
         $('#weeklyTotal').textContent = currentWeekTotal;
         $('#allTimeTotal').textContent = stats.totalReps;
-        $('#setsToday').textContent = entries.filter(e => e.date === dateInput).length;
+        $('#setsToday').textContent = filteredEntries.filter(e => e.date === dateInput).length;
+        $('#avgSet').textContent = stats.setsToday > 0 ? Math.round(todayTotal / stats.setsToday) : 0;
+        $('#weeklyAvg').textContent = Object.keys(stats.weeklyTotals).length > 0 
+             ? Math.round(stats.totalReps / Object.keys(stats.weeklyTotals).length) : 0;
 
         // Target
         const pct = Math.min(100, Math.round((todayTotal / currentTarget) * 100));
@@ -506,13 +537,14 @@
         $('#targetBar').style.width = `${pct}%`;
         $('#targetStatus').className = `pill target-pill ${pct >= 100 ? 'ok' : 'warn'}`;
         
-        renderTodayLog(dateInput);
-        renderFullHistory();
-        renderChart();
+        // Pass Filtered Entries to sub-renders
+        renderTodayLog(filteredEntries, dateInput);
+        renderFullHistory(filteredEntries);
+        renderChart(filteredEntries);
     }
 
-    function renderTodayLog(date) {
-        const todayEntries = entries.filter(e => e.date === date).reverse();
+    function renderTodayLog(data, date) {
+        const todayEntries = data.filter(e => e.date === date).reverse();
         const panel = $('#todayLogPanel');
         const list = $('#todayLogList');
         
@@ -537,9 +569,9 @@
         `).join('');
     }
 
-    function renderFullHistory() {
+    function renderFullHistory(data) {
         const grouped = {};
-        entries.forEach(e => {
+        data.forEach(e => {
             const m = e.date.substring(0, 7);
             if(!grouped[m]) grouped[m] = {};
             if(!grouped[m][e.date]) grouped[m][e.date] = [];
@@ -585,7 +617,7 @@
         $('#logContainer').innerHTML = html;
     }
 
-    function renderChart() {
+    function renderChart(data) {
         const ctx = $('#chart').getContext('2d');
         if(chartInstance) chartInstance.destroy();
         const days = Number($('#chartDays').value);
@@ -597,7 +629,7 @@
             d.setDate(today.getDate() - i);
             const iso = d.toISOString().slice(0,10);
             labels.push(iso.slice(5));
-            dataPoints.push(entries.filter(e => e.date === iso).reduce((s,x)=>s+x.reps, 0));
+            dataPoints.push(data.filter(e => e.date === iso).reduce((s,x)=>s+x.reps, 0));
         }
 
         chartInstance = new Chart(ctx, {
@@ -605,7 +637,7 @@
             data: {
                 labels,
                 datasets: [{
-                    label: 'Reps',
+                    label: currentExercise,
                     data: dataPoints,
                     borderColor: '#4f8cff',
                     backgroundColor: 'rgba(79, 140, 255, 0.1)',
@@ -617,7 +649,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { x: { grid: { color: '#222' } }, y: { grid: { color: '#222' }, beginAtZero: true } },
-                plugins: { legend: { display: false } }
+                plugins: { legend: { display: true } }
             }
         });
     }
@@ -643,7 +675,7 @@
         setTimeout(()=>div.remove(), 4000);
     }
 
-    // --- 6. HELPERS ---
+    // --- 6. HELPERS & INIT ---
     
     function setLoading(isLoading) {
         $('#loadingIndicator').style.display = isLoading ? 'block' : 'none';
@@ -652,41 +684,102 @@
         });
     }
 
+    function updateTypeDropdown() {
+        const typeSelect = $('#type');
+        typeSelect.innerHTML = ''; 
+        const config = EXERCISE_CONFIG[currentExercise];
+        
+        config.types.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t; 
+            opt.textContent = t; 
+            typeSelect.appendChild(opt);
+        });
+        
+        // Update Target default
+        currentTarget = config.defaultTarget || 30;
+        $('#dailyTarget').value = currentTarget;
+    }
+
     function init() {
         flatpickr('#date', { defaultDate: 'today', dateFormat: 'Y-m-d', onChange: render });
         
-        const typeSelect = $('#type');
-        EXERCISE_CONFIG['Push-up'].types.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t; opt.textContent = t; typeSelect.appendChild(opt);
+        // Handle Exercise Selection Change
+        $('#exerciseSelect').addEventListener('change', (e) => {
+            currentExercise = e.target.value;
+            updateTypeDropdown(); 
+            render(); 
         });
+        
+        updateTypeDropdown();
 
         $('#addBtn').addEventListener('click', addEntry);
-        $('#chartDays').addEventListener('change', renderChart);
+        $('#chartDays').addEventListener('change', () => {
+             const filtered = allEntries.filter(e => e.exercise === currentExercise);
+             renderChart(filtered);
+        });
         $('#dailyTarget').addEventListener('input', (e) => { currentTarget = e.target.value; render(); });
         $('#expandAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='block'));
         $('#collapseAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='none'));
 
-        // Global handlers
         window.deleteEntry = deleteEntry;
+        
+        // --- IMPROVED EDIT MODAL ---
         window.openEditModal = (id) => {
-            const e = entries.find(x => x.id === id);
+            const e = allEntries.find(x => x.id === id);
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
+            
+            // Generate options for Exercises
+            const exOptions = Object.keys(EXERCISE_CONFIG).map(ex => 
+                `<option value="${ex}" ${ex===e.exercise ? 'selected' : ''}>${ex}</option>`
+            ).join('');
+
+            // Generate options for Types (initially based on current exercise)
+            const typeOptions = EXERCISE_CONFIG[e.exercise || 'Push-up'].types.map(t =>
+                `<option ${t===e.type?'selected':''}>${t}</option>`
+            ).join('');
+
             overlay.innerHTML = `
                 <div class="modal">
                     <h3>Edit Set</h3>
-                    <label>Reps</label><input id="editReps" type="number" value="${e.reps}">
-                    <label>Type</label><select id="editType">${EXERCISE_CONFIG['Push-up'].types.map(t=>`<option ${t===e.type?'selected':''}>${t}</option>`)}</select>
-                    <label>Note</label><input id="editNote" type="text" value="${e.note||''}">
+                    <label>Exercise</label>
+                    <select id="editExercise">${exOptions}</select>
+                    
+                    <label>Type</label>
+                    <select id="editType">${typeOptions}</select>
+                    
+                    <label>Reps</label>
+                    <input id="editReps" type="number" value="${e.reps}">
+                    
+                    <label>Note</label>
+                    <input id="editNote" type="text" value="${e.note||''}">
+                    
                     <div class="modal-buttons">
                         <button class="ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
                         <button class="primary" id="saveEditBtn">Save</button>
                     </div>
                 </div>`;
             document.body.appendChild(overlay);
+            
+            // Add listener to update Types when Exercise changes
+            const exSelect = overlay.querySelector('#editExercise');
+            const typeSelect = overlay.querySelector('#editType');
+            
+            exSelect.addEventListener('change', () => {
+                const newEx = exSelect.value;
+                const newTypes = EXERCISE_CONFIG[newEx].types;
+                typeSelect.innerHTML = newTypes.map(t => `<option>${t}</option>`).join('');
+            });
+
             overlay.querySelector('#saveEditBtn').onclick = () => {
-                updateEntry(id, Number($('#editReps').value), $('#editType').value, $('#editNote').value);
+                updateEntry(
+                    id, 
+                    Number($('#editReps').value), 
+                    $('#editType').value, 
+                    $('#editNote').value,
+                    $('#editExercise').value
+                );
                 overlay.remove();
             };
         };
