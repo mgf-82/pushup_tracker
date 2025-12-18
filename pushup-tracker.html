@@ -354,6 +354,11 @@
         <button id="clearTodayBtn" class="ghost">Clear Today</button>
         <button id="deleteLastBtn" class="ghost" style="border-color:#f97316;color:#f97316">Delete Last Entry</button>
       </div>
+      
+      <div id="todayLogPanel" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #333; display: none;">
+          <h3 style="font-size: 18px; margin: 0 0 12px; color: var(--fg);">Sets for Selected Date</h3>
+          <div id="todayLogList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
     </section>
     
     <section class="card" aria-labelledby="prH" style="display:none" data-section id="prSection">
@@ -412,7 +417,7 @@
 
       <div class="spacer" style="margin-top: 24px;"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h3 style="margin:0;font-size:20px">History</h3>
+          <h3 style="margin:0;font-size:20px">Full History</h3>
           <div style="display:flex;gap:8px">
               <button id="expandAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Expand All</button>
               <button id="collapseAllBtn" class="ghost" style="padding:6px 12px;font-size:14px">Collapse All</button>
@@ -1366,6 +1371,42 @@
             .join('');
     }
 
+    // --- NEW: Function to render the simple "Today's Log" list ---
+    function renderTodayLog() {
+        const displayDate = $('#date').value || todayDisplay();
+        const targetDate = parseDateFromDisplay(displayDate);
+        
+        const daysEntries = state.entries.filter(e => e.date === targetDate);
+        daysEntries.sort((a,b) => b.createdAt - a.createdAt); // Newest first
+
+        const container = $('#todayLogList');
+        const panel = $('#todayLogPanel');
+        const header = panel.querySelector('h3');
+        
+        if (!container || !panel) return;
+        
+        if (daysEntries.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+        
+        panel.style.display = 'block';
+        header.textContent = `Sets for ${displayDate}`;
+        
+        container.innerHTML = daysEntries.map(e => `
+            <div class="set-item" style="background:#1a1a1c; padding: 10px 14px;">
+                <div class="set-info">
+                    <strong>${e.reps}</strong> <span style="font-size:14px; color:var(--muted)">${escapeHtml(e.type)}</span>
+                    ${e.note ? `<span style="font-size:12px; color:var(--muted); display:block">${escapeHtml(e.note)}</span>` : ''}
+                </div>
+                <div class="set-actions">
+                    <button data-id="${e.id}" class="ghost edit-btn" style="padding:4px 8px; font-size:13px">Edit</button>
+                    <button data-id="${e.id}" class="ghost del-btn" style="padding:4px 8px; font-size:13px; color:var(--bad)">Del</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
     function render(){
       // FIX: Ensure date value is not overwritten if user is typing
       if (!$('#date').value) {
@@ -1382,6 +1423,7 @@
       
       if(needsFullRender){
         renderLog();
+        renderTodayLog(); // Update the new panel
         lastRenderedState = stateStr;
       }
       
@@ -1925,60 +1967,66 @@
       }, CONSTANTS.TARGET_DEBOUNCE_MS);
     });
 
-    // --- NEW: Event Listener for Log interactions in the main Chart Section ---
-    document.getElementById('chartSection').addEventListener('click', (e) => {
+    // --- UPDATED: Event Listener Delegation for both Log sections ---
+    // Now handles clicks in both #chartSection (Full History) and #addEntrySection (Today's Log)
+    document.addEventListener('click', (e) => {
       if(!isStorageReady) return;
       
       const btn = e.target.closest('button');
-      if(btn) {
-          if (btn.id === 'expandAllBtn') {
-            document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'block');
-            document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▲');
-            return;
-          }
-          if (btn.id === 'collapseAllBtn') {
-            document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'none');
-            document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▼');
-            return;
-          }
-          
+      if (!btn) return;
+      
+      // Global Expand/Collapse handlers for the full log
+      if (btn.id === 'expandAllBtn') {
+        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'block');
+        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▲');
+        return;
+      }
+      if (btn.id === 'collapseAllBtn') {
+        document.getElementById('logContainer').querySelectorAll('.month-content, .day-sets').forEach(el => el.style.display = 'none');
+        document.getElementById('logContainer').querySelectorAll('[id^="month-arrow-"], [id^="arrow-"]').forEach(el => el.textContent = '▼');
+        return;
+      }
+      
+      // Handle Edit/Delete buttons (checking class existence)
+      if (btn.classList.contains('del-btn') || btn.classList.contains('edit-btn')) {
           const id = btn.getAttribute('data-id');
-          if(id) {
-              if(btn.classList.contains('del-btn')){
-                const overlay = document.createElement('div');
-                overlay.className = 'modal-overlay';
-                overlay.innerHTML = `
-                  <div class="modal" role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
-                    <h3 id="deleteModalTitle" style="color:var(--bad)">Confirm Deletion</h3>
-                    <p>Are you sure you want to permanently delete this set?</p>
-                    <div class="modal-buttons">
-                      <button class="ghost" id="cancelDelete">Cancel</button>
-                      <button class="danger" id="confirmDelete" data-id="${id}">Delete</button>
-                    </div>
-                  </div>
-                `;
-                document.body.appendChild(overlay);
-                overlay.querySelector('#confirmDelete').addEventListener('click', () => {
-                  setLoading('confirmDelete', true, 'Deleting...');
-                  try {
-                      const entryIdToDelete = overlay.querySelector('#confirmDelete').getAttribute('data-id');
-                      const newState = { ...state, entries: state.entries.filter(x => x.id !== entryIdToDelete) };
-                      calculateAllStats(newState.entries, newState);
-                      saveState(newState); 
-                      overlay.remove();
-                      showSuccess('Set deleted successfully.');
-                  } catch (e) { showError('Failed to delete set.'); } 
-                  finally { setLoading('confirmDelete', false, 'Delete'); }
-                });
-                overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
-                overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-              }
-              if(btn.classList.contains('edit-btn')){
-                showEditModal(id);
-              }
+          if(!id) return;
+
+          if(btn.classList.contains('del-btn')){
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+              <div class="modal" role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
+                <h3 id="deleteModalTitle" style="color:var(--bad)">Confirm Deletion</h3>
+                <p>Are you sure you want to permanently delete this set?</p>
+                <div class="modal-buttons">
+                  <button class="ghost" id="cancelDelete">Cancel</button>
+                  <button class="danger" id="confirmDelete" data-id="${id}">Delete</button>
+                </div>
+              </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#confirmDelete').addEventListener('click', () => {
+              setLoading('confirmDelete', true, 'Deleting...');
+              try {
+                  const entryIdToDelete = overlay.querySelector('#confirmDelete').getAttribute('data-id');
+                  const newState = { ...state, entries: state.entries.filter(x => x.id !== entryIdToDelete) };
+                  calculateAllStats(newState.entries, newState);
+                  saveState(newState); 
+                  overlay.remove();
+                  showSuccess('Set deleted successfully.');
+              } catch (e) { showError('Failed to delete set.'); } 
+              finally { setLoading('confirmDelete', false, 'Delete'); }
+            });
+            overlay.querySelector('#cancelDelete').addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
+          }
+          if(btn.classList.contains('edit-btn')){
+            showEditModal(id);
           }
       }
-
+      
+      // Handle Month/Day headers in full log
       const header = e.target.closest('.month-header, .day-header');
       if (header) {
           if (header.classList.contains('month-header')) {
@@ -2213,7 +2261,11 @@
       allowInput: true,
       clickOpens: true,
       weekNumbers: true,
-      disableMobile: true
+      disableMobile: true,
+      onChange: function(selectedDates, dateStr, instance) {
+         // Trigger app update on date selection
+         scheduleRender();
+      }
     });
   }
   
@@ -2242,7 +2294,10 @@
             allowInput: true,
             clickOpens: true,
             weekNumbers: true,
-            disableMobile: true
+            disableMobile: true,
+            onChange: function(selectedDates, dateStr, instance) {
+                scheduleRender();
+            }
           });
           if (inst) inst.open();
           return;
