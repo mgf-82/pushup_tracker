@@ -233,8 +233,8 @@
             <div class="value" id="allTimeTotal">0</div>
           </div>
           <div class="stat-card">
-            <label>Weekly Average</label>
-            <div class="value" id="weeklyAvg">0</div>
+            <label>Vs Last Week</label>
+            <div class="value" id="weekVsLast">0%</div>
           </div>
         </div>
 
@@ -365,6 +365,7 @@
             render();
             $('#reps').value = '';
             $('#note').value = '';
+            $('#reps').focus(); // Focus back to reps for quick entry
         }
     }
 
@@ -520,16 +521,44 @@
 
         // Summary
         const todayTotal = stats.dailyTotals[dateInput] || 0;
-        const weekStart = wkRange(dateInput)[0];
-        const currentWeekTotal = stats.weeklyTotals[weekStart] || 0;
+        
+        // --- FEATURE: Week Comparison Logic ---
+        const todayDateObj = new Date();
+        const thisWeekStart = wkRange(todayDateObj.toISOString().slice(0,10))[0];
+        const currentWeekTotal = stats.weeklyTotals[thisWeekStart] || 0;
+        
+        // Calculate Previous Week Start
+        const d = new Date(thisWeekStart);
+        d.setDate(d.getDate() - 7);
+        const lastWeekStart = d.toISOString().slice(0,10);
+        const lastWeekTotal = stats.weeklyTotals[lastWeekStart] || 0;
+
+        let diffText = "—";
+        let diffColor = "var(--muted)";
+        if(lastWeekTotal > 0) {
+            const pct = ((currentWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
+            const sign = pct > 0 ? "+" : "";
+            diffText = `${sign}${pct.toFixed(0)}%`;
+            diffColor = pct >= 0 ? "var(--ok)" : "var(--bad)";
+        } else if (currentWeekTotal > 0) {
+            diffText = "+100%";
+            diffColor = "var(--ok)";
+        }
+        
+        const weekVsEl = $('#weekVsLast');
+        if(weekVsEl) {
+            weekVsEl.textContent = diffText;
+            weekVsEl.style.color = diffColor;
+        }
+        // --------------------------------------
 
         $('#dailyTotal').textContent = todayTotal;
         $('#weeklyTotal').textContent = currentWeekTotal;
         $('#allTimeTotal').textContent = stats.totalReps;
         $('#setsToday').textContent = filteredEntries.filter(e => e.date === dateInput).length;
         $('#avgSet').textContent = stats.setsToday > 0 ? Math.round(todayTotal / stats.setsToday) : 0;
-        $('#weeklyAvg').textContent = Object.keys(stats.weeklyTotals).length > 0 
-             ? Math.round(stats.totalReps / Object.keys(stats.weeklyTotals).length) : 0;
+        
+        // Renaming Weekly Average to Week vs Last Week in DOM in future? For now, we added a new card.
 
         // Target
         const pct = Math.min(100, Math.round((todayTotal / currentTarget) * 100));
@@ -632,6 +661,9 @@
             dataPoints.push(data.filter(e => e.date === iso).reduce((s,x)=>s+x.reps, 0));
         }
 
+        // --- FEATURE: Target Line Data ---
+        const targetData = Array(days).fill(currentTarget);
+
         chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
@@ -643,6 +675,16 @@
                     backgroundColor: 'rgba(79, 140, 255, 0.1)',
                     fill: true,
                     tension: 0.3
+                },
+                // Added Target Line Dataset
+                {
+                    label: 'Daily Target',
+                    data: targetData,
+                    borderColor: '#f59e0b',
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    fill: false
                 }]
             },
             options: {
@@ -714,6 +756,14 @@
         updateTypeDropdown();
 
         $('#addBtn').addEventListener('click', addEntry);
+        
+        // --- FEATURE: Enter to submit ---
+        ['#reps', '#note'].forEach(selector => {
+            $(selector).addEventListener('keydown', (e) => {
+                if(e.key === 'Enter') addEntry();
+            });
+        });
+
         $('#chartDays').addEventListener('change', () => {
              const filtered = allEntries.filter(e => e.exercise === currentExercise);
              renderChart(filtered);
