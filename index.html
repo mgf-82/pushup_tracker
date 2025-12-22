@@ -10,8 +10,8 @@
     :root { --bg:#0b0b0c; --fg:#e7e7ea; --muted:#9aa0a6; --card:#151517; --accent:#4f8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     html,body{height:100%}
     body{margin:0;font:18px "Century Gothic", CenturyGothic, AppleGothic, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column}
-    header{padding:24px 32px;border-bottom:1px solid #222;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-    header h1{font-size:20px;margin:0;letter-spacing:.3px}
+    header{padding:24px 32px;border-bottom:1px solid #222;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    header h4{font-size:20px;margin:0;letter-spacing:.3px}
     
     main{
       width: 100%; max-width: 1600px; margin: 0 auto; padding: 32px;
@@ -79,22 +79,48 @@
     .set-actions{display:flex;gap:10px}
     .set-actions button{padding:6px 12px;font-size:13px}
 
-    /* Summary Grid */
-    #summarySection .summary-grid{display:grid;grid-template-columns:1fr 1fr 280px;gap:12px;align-items:stretch;flex:1}
-    @media (max-width: 900px){ #summarySection .summary-grid{grid-template-columns:1fr;gap:12px} }
-    #summarySection .summary-left{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;grid-column:1/3;}
-    #summarySection .stat-card{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:12px;background:#0f1012;border-radius:8px;min-height:100px}
-    #summarySection .stat-card label{font-size:16px;color:var(--fg);margin-bottom:8px;text-align:center;font-weight:500}
-    #summarySection .stat-card .value{font-size:44px;font-weight:700;line-height:1}
-    #summarySection .summary-right{display:flex;flex-direction:column;gap:12px}
-    #summarySection .control-card{display:flex;flex-direction:column;padding:12px;background:#0f1012;border-radius:8px;flex:1}
-
     .streak-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f59e0b,#ef4444);padding:10px 16px;border-radius:12px;font-weight:600;color:white;font-size:16px}
     
+    /* --- NEW UI UPGRADE STYLES --- */
+
+    /* 1. Header Hero Count */
+    .daily-hero {
+        display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+        background: rgba(79, 140, 255, 0.15); border: 1px solid var(--accent);
+        padding: 4px 14px; border-radius: 8px; margin-left: auto;
+    }
+    .daily-hero span { font-size: 11px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .daily-hero strong { font-size: 20px; line-height: 1; color: #fff; }
+
+    /* 2. Modern Summary Dashboard */
+    .summary-modern { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .summary-modern { grid-template-columns: 1fr; } }
+
+    .stat-box {
+        background: #1a1a1c; border-radius: 12px; padding: 20px;
+        display: flex; flex-direction: column; justify-content: space-between;
+        border: 1px solid #2a2b2f; position: relative; overflow: hidden;
+    }
+
+    .stat-box h3 { font-size: 14px; color: var(--muted); margin: 0 0 8px 0; font-weight: 500; display:flex; align-items:center; gap:6px; }
+    .stat-box .main-value { font-size: 32px; font-weight: 700; color: var(--fg); line-height: 1.1; }
+    .stat-box .sub-text { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .stat-box .trend-tag { font-size: 13px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+    .trend-up { color: var(--ok); background: rgba(34, 197, 94, 0.1); }
+    .trend-down { color: var(--bad); background: rgba(239, 68, 68, 0.1); }
+
+    /* Target Bar Redesign */
+    .target-container { margin-top: 12px; }
+    .target-info { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    .modern-progress { height: 8px; background: #2a2b2f; border-radius: 4px; overflow: hidden; }
+    .modern-bar { height: 100%; background: var(--accent); border-radius: 4px; width: 0%; transition: width 0.5s ease; box-shadow: 0 0 10px rgba(79, 140, 255, 0.4); }
+
     /* Mobile tweaks */
     @media (max-width: 480px) {
       main { padding: 16px; grid-template-columns: 1fr; }
-      header { position: sticky; top: 0; z-index: 60; background: rgba(11,11,12,0.95); }
+      header { position: sticky; top: 0; z-index: 60; background: rgba(11,11,12,0.95); padding: 16px 20px;}
+      header h4 { display: none; } /* Hide text title on small screens */
+      .daily-hero { margin-left: auto; }
       .row > * { flex: 1 1 100%; }
       #chart { height: 250px !important; }
     }
@@ -103,12 +129,16 @@
 </head>
 <body>
   <header>
-    <div style="display:flex;align-items:center;gap:16px">
-      <h4>Stronger Every Press</h4>
-      <span class="pill" id="storageInfo" style="color:var(--ok);border-color:var(--ok)">Supabase Cloud</span>
-      <div id="streakBadge"></div>
+    <div style="display:flex;align-items:center;gap:12px">
+        <h4>Stronger Every Press</h4>
+        <div id="streakBadge"></div>
+        <span class="pill" id="weekInfo">Week: —</span>
     </div>
-    <div style="margin-left:auto" class="pill" id="weekInfo">Week: —</div>
+    
+    <div class="daily-hero">
+        <span>Daily Total</span>
+        <strong id="headerDailyCount">0</strong>
+    </div>
   </header>
 
   <main id="appContent">
@@ -209,48 +239,48 @@
     </section>
 
     <section class="card" id="summarySection" style="display:none">
-      <h2>Summary & Goals</h2>
-      <div class="summary-grid">
-        <div class="summary-left">
-          <div class="stat-card">
-            <label>Daily Total</label>
-            <div class="value" id="dailyTotal">0</div>
-          </div>
-          <div class="stat-card">
-            <label>Weekly Total</label>
-            <div class="value" id="weeklyTotal">0</div>
-          </div>
-          <div class="stat-card">
-            <label>Sets Today</label>
-            <div class="value" id="setsToday">0</div>
-          </div>
-          <div class="stat-card">
-            <label>Avg Per Set</label>
-            <div class="value" id="avgSet">0</div>
-          </div>
-          <div class="stat-card">
-            <label>All-time Total</label>
-            <div class="value" id="allTimeTotal">0</div>
-          </div>
-          <div class="stat-card">
-            <label>Vs Last Week</label>
-            <div class="value" id="weekVsLast">0%</div>
-          </div>
-        </div>
-
-        <div class="summary-right">
-          <div class="control-card">
-            <label for="dailyTarget">Daily Target</label>
-            <input id="dailyTarget" type="number" min="0" value="30" />
-            <div class="progress-wrapper">
-              <span class="pill target-pill" id="targetStatus">0%</span>
-              <div class="progress-container">
-                <div id="targetBar" class="progress-inner"></div>
-              </div>
+        <h2 style="margin-bottom:20px;">Performance Overview</h2>
+        
+        <div class="summary-modern">
+            <div class="stat-box">
+                <h3>🎯 Today's Target</h3>
+                <div class="main-value" id="summaryToday">0</div>
+                <div class="target-container">
+                    <div class="target-info">
+                        <span>Goal: <input id="dailyTarget" type="number" value="30" style="width:50px; padding:2px; background:transparent; border:none; border-bottom:1px solid #444; color:var(--muted); text-align:center;"></span>
+                        <span id="targetPercent">0%</span>
+                    </div>
+                    <div class="modern-progress">
+                        <div id="targetBar" class="modern-bar"></div>
+                    </div>
+                </div>
             </div>
-          </div>
+    
+            <div class="stat-box">
+                <h3>📅 This Week</h3>
+                <div class="main-value" id="weeklyTotal">0</div>
+                <div class="sub-text">
+                    Vs Last Week: <span id="weekVsLast" class="trend-tag">0%</span>
+                </div>
+            </div>
+    
+            <div class="stat-box">
+                <h3>⚡ Efficiency</h3>
+                <div style="display:flex; gap:20px;">
+                    <div>
+                        <div class="main-value" id="avgSet" style="font-size:24px;">0</div>
+                        <div class="sub-text">Avg Reps</div>
+                    </div>
+                    <div>
+                        <div class="main-value" id="setsToday" style="font-size:24px;">0</div>
+                        <div class="sub-text">Sets Done</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px; padding-top:12px; border-top:1px solid #333; font-size:13px; color:var(--muted)">
+                    Lifetime Total: <strong style="color:var(--fg)" id="allTimeTotal">0</strong>
+                </div>
+            </div>
         </div>
-      </div>
     </section>
   </main>
 
@@ -519,52 +549,57 @@
             });
         }
 
-        // Summary
+        // --- NEW SUMMARY & HEADER RENDER LOGIC ---
         const todayTotal = stats.dailyTotals[dateInput] || 0;
+
+        // Header Hero Count
+        $('#headerDailyCount').textContent = todayTotal;
         
-        // --- FEATURE: Week Comparison Logic ---
+        // Summary Card 1: Today
+        $('#summaryToday').textContent = todayTotal;
+        
+        // Logic for Week Comparison
         const todayDateObj = new Date();
         const thisWeekStart = wkRange(todayDateObj.toISOString().slice(0,10))[0];
         const currentWeekTotal = stats.weeklyTotals[thisWeekStart] || 0;
         
-        // Calculate Previous Week Start
+        // Previous Week Calculation
         const d = new Date(thisWeekStart);
         d.setDate(d.getDate() - 7);
         const lastWeekStart = d.toISOString().slice(0,10);
         const lastWeekTotal = stats.weeklyTotals[lastWeekStart] || 0;
 
         let diffText = "—";
-        let diffColor = "var(--muted)";
+        let diffClass = "";
         if(lastWeekTotal > 0) {
             const pct = ((currentWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
             const sign = pct > 0 ? "+" : "";
             diffText = `${sign}${pct.toFixed(0)}%`;
-            diffColor = pct >= 0 ? "var(--ok)" : "var(--bad)";
+            diffClass = pct >= 0 ? "trend-up" : "trend-down";
         } else if (currentWeekTotal > 0) {
             diffText = "+100%";
-            diffColor = "var(--ok)";
+            diffClass = "trend-up";
         }
-        
+
+        // Summary Card 2: Week
+        $('#weeklyTotal').textContent = currentWeekTotal;
         const weekVsEl = $('#weekVsLast');
         if(weekVsEl) {
             weekVsEl.textContent = diffText;
-            weekVsEl.style.color = diffColor;
+            weekVsEl.className = `trend-tag ${diffClass}`;
         }
-        // --------------------------------------
 
-        $('#dailyTotal').textContent = todayTotal;
-        $('#weeklyTotal').textContent = currentWeekTotal;
-        $('#allTimeTotal').textContent = stats.totalReps;
-        $('#setsToday').textContent = filteredEntries.filter(e => e.date === dateInput).length;
+        // Summary Card 3: Efficiency
         $('#avgSet').textContent = stats.setsToday > 0 ? Math.round(todayTotal / stats.setsToday) : 0;
-        
-        // Renaming Weekly Average to Week vs Last Week in DOM in future? For now, we added a new card.
+        $('#setsToday').textContent = filteredEntries.filter(e => e.date === dateInput).length;
+        $('#allTimeTotal').textContent = stats.totalReps.toLocaleString();
 
-        // Target
+        // Target Bar
         const pct = Math.min(100, Math.round((todayTotal / currentTarget) * 100));
-        $('#targetStatus').textContent = `${pct}%`;
+        $('#targetPercent').textContent = `${pct}%`;
         $('#targetBar').style.width = `${pct}%`;
-        $('#targetStatus').className = `pill target-pill ${pct >= 100 ? 'ok' : 'warn'}`;
+        if(pct >= 100) $('#targetBar').style.background = 'var(--ok)';
+        else $('#targetBar').style.background = 'var(--accent)';
         
         // Pass Filtered Entries to sub-renders
         renderTodayLog(filteredEntries, dateInput);
@@ -661,7 +696,7 @@
             dataPoints.push(data.filter(e => e.date === iso).reduce((s,x)=>s+x.reps, 0));
         }
 
-        // --- FEATURE: Target Line Data ---
+        // Target Line Data
         const targetData = Array(days).fill(currentTarget);
 
         chartInstance = new Chart(ctx, {
@@ -676,7 +711,6 @@
                     fill: true,
                     tension: 0.3
                 },
-                // Added Target Line Dataset
                 {
                     label: 'Daily Target',
                     data: targetData,
@@ -757,7 +791,7 @@
 
         $('#addBtn').addEventListener('click', addEntry);
         
-        // --- FEATURE: Enter to submit ---
+        // Enter to submit
         ['#reps', '#note'].forEach(selector => {
             $(selector).addEventListener('keydown', (e) => {
                 if(e.key === 'Enter') addEntry();
@@ -774,7 +808,7 @@
 
         window.deleteEntry = deleteEntry;
         
-        // --- IMPROVED EDIT MODAL ---
+        // --- EDIT MODAL ---
         window.openEditModal = (id) => {
             const e = allEntries.find(x => x.id === id);
             const overlay = document.createElement('div');
