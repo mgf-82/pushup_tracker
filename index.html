@@ -81,7 +81,7 @@
 
     .streak-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f59e0b,#ef4444);padding:10px 16px;border-radius:12px;font-weight:600;color:white;font-size:16px}
     
-    /* --- NEW UI UPGRADE STYLES --- */
+    /* --- UI UPGRADE STYLES --- */
 
     /* 1. Header Hero Count */
     .daily-hero {
@@ -589,9 +589,10 @@
             weekVsEl.className = `trend-tag ${diffClass}`;
         }
 
-        // Summary Card 3: Efficiency
-        $('#avgSet').textContent = stats.setsToday > 0 ? Math.round(todayTotal / stats.setsToday) : 0;
-        $('#setsToday').textContent = filteredEntries.filter(e => e.date === dateInput).length;
+        // Summary Card 3: Efficiency (FIXED)
+        const setsTodayCount = filteredEntries.filter(e => e.date === dateInput).length;
+        $('#avgSet').textContent = setsTodayCount > 0 ? Math.round(todayTotal / setsTodayCount) : 0;
+        $('#setsToday').textContent = setsTodayCount;
         $('#allTimeTotal').textContent = stats.totalReps.toLocaleString();
 
         // Target Bar
