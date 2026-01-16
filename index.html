@@ -328,15 +328,40 @@
     let allEntries = []; // Holds EVERYTHING
     let chartInstance = null;
     let currentTarget = 30;
+    let currentUserId = null;
     const defaultPR = { reps: 0, date: '—' };
     
     const $ = sel => document.querySelector(sel);
     
     // --- 3. CORE LOGIC ---
+    async function ensureSignedIn() {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) console.error(userError);
+        if (userData?.user) {
+            currentUserId = userData.user.id;
+            return userData.user;
+        }
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) {
+            alert('Auth error: ' + error.message);
+            return null;
+        }
+        currentUserId = data.user?.id || null;
+        return data.user || null;
+    }
 
     async function fetchData() {
         setLoading(true);
-        const { data, error } = await supabase.from('pushup_logs').select('*').order('created_at', { ascending: true });
+        const user = await ensureSignedIn();
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        const { data, error } = await supabase
+            .from('pushup_logs')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true });
         
         if (error) {
             console.error(error);
@@ -366,8 +391,10 @@
         const reps = Number($('#reps').value);
         const type = $('#type').value;
         const note = $('#note').value;
+        const userId = currentUserId || (await ensureSignedIn())?.id;
         
         if(!reps || reps < 1) return alert("Please enter valid reps");
+        if (!userId) return;
 
         // Filter for calculation context
         const currentFiltered = allEntries.filter(e => e.exercise === currentExercise);
@@ -377,7 +404,7 @@
         // SAVE TO SUPABASE
         const { data, error } = await supabase
             .from('pushup_logs')
-            .insert([{ date, reps, type, note, exercise: currentExercise }])
+            .insert([{ date, reps, type, note, exercise: currentExercise, user_id: userId }])
             .select();
 
         if (error) {
