@@ -329,11 +329,50 @@
     let chartInstance = null;
     let currentTarget = 30;
     let currentUserId = null;
+    let targetOverrides = {};
     const defaultPR = { reps: 0, date: '—' };
     
     const $ = sel => document.querySelector(sel);
     
     // --- 3. CORE LOGIC ---
+    async function loadTargetsFromDb() {
+        targetOverrides = {};
+        if (!currentUserId) {
+            const user = await ensureSignedIn();
+            if (!user) return;
+        }
+        const { data, error } = await supabase
+            .from('exercise_targets')
+            .select('exercise, target')
+            .eq('user_id', currentUserId);
+        if (error) {
+            console.error(error);
+            return;
+        }
+        (data || []).forEach(row => {
+            if (row.exercise) targetOverrides[row.exercise] = row.target;
+        });
+    }
+
+    async function saveTarget(exercise, value) {
+        if (!currentUserId) {
+            const user = await ensureSignedIn();
+            if (!user) return;
+        }
+        targetOverrides[exercise] = value;
+        const { error } = await supabase
+            .from('exercise_targets')
+            .upsert(
+                { user_id: currentUserId, exercise, target: value },
+                { onConflict: 'user_id,exercise' }
+            );
+        if (error) console.error(error);
+    }
+
+    function getTargetFor(exercise) {
+        return targetOverrides[exercise] ?? EXERCISE_CONFIG[exercise]?.defaultTarget ?? 30;
+    }
+
     async function ensureSignedIn() {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) console.error(userError);
@@ -352,15 +391,21 @@
 
     async function fetchData() {
         setLoading(true);
-        const user = await ensureSignedIn();
-        if (!user) {
+        if (!currentUserId) {
+            const user = await ensureSignedIn();
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+        }
+        if (!currentUserId) {
             setLoading(false);
             return;
         }
         const { data, error } = await supabase
             .from('pushup_logs')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', currentUserId)
             .order('created_at', { ascending: true });
         
         if (error) {
@@ -801,11 +846,11 @@
         });
         
         // Update Target default
-        currentTarget = config.defaultTarget || 30;
+        currentTarget = getTargetFor(currentExercise);
         $('#dailyTarget').value = currentTarget;
     }
 
-    function init() {
+    async function init() {
         flatpickr('#date', { defaultDate: 'today', dateFormat: 'Y-m-d', onChange: render });
         
         // Handle Exercise Selection Change
@@ -816,6 +861,12 @@
         });
         
         updateTypeDropdown();
+
+        const user = await ensureSignedIn();
+        if (user) {
+            await loadTargetsFromDb();
+            updateTypeDropdown();
+        }
 
         $('#addBtn').addEventListener('click', addEntry);
         
@@ -830,7 +881,13 @@
              const filtered = allEntries.filter(e => e.exercise === currentExercise);
              renderChart(filtered);
         });
-        $('#dailyTarget').addEventListener('input', (e) => { currentTarget = e.target.value; render(); });
+        $('#dailyTarget').addEventListener('input', async (e) => {
+            const nextTarget = Number(e.target.value);
+            if (!Number.isFinite(nextTarget) || nextTarget < 1) return;
+            currentTarget = nextTarget;
+            await saveTarget(currentExercise, nextTarget);
+            render();
+        });
         $('#expandAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='block'));
         $('#collapseAllBtn').addEventListener('click', () => document.querySelectorAll('.month-content, .day-sets').forEach(e=>e.style.display='none'));
 
@@ -896,7 +953,7 @@
             };
         };
 
-        fetchData();
+        await fetchData();
     }
 
     init();
