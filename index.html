@@ -151,6 +151,10 @@
       <p style="color:var(--muted);margin-top:0">We will email you a magic link to sign in.</p>
       <label for="authEmail">Email</label>
       <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <div class="row" style="margin-top:8px;align-items:center">
+        <input id="rememberMe" type="checkbox" style="width:auto;margin:0" />
+        <label for="rememberMe" style="margin:0">Stay signed in on this device</label>
+      </div>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="authSendLink">Send magic link</button>
       </div>
@@ -305,7 +309,24 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3ZnpkbnByc2V1aXp6Z3lnZW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMDUzMDksImV4cCI6MjA4MTU4MTMwOX0.K00q1xtHtC4piuacViSqlAOV26xtPRqshcTxFsGBDKk';
     
     // Initialize Client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const AUTH_STORAGE_KEY = 'pushup_auth_remember';
+    const rememberMePref = (() => {
+        try {
+            const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+            return raw === null ? true : raw === 'true';
+        } catch {
+            return true;
+        }
+    })();
+    const authStorage = rememberMePref ? window.localStorage : window.sessionStorage;
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: {
+            storage: authStorage,
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+        }
+    });
 
     // --- 2. CONFIG & STATE ---
     const EXERCISE_CONFIG = {
@@ -896,6 +917,17 @@
         });
         
         updateTypeDropdown();
+
+        const rememberEl = $('#rememberMe');
+        if (rememberEl) {
+            rememberEl.checked = rememberMePref;
+            rememberEl.addEventListener('change', () => {
+                try {
+                    localStorage.setItem(AUTH_STORAGE_KEY, String(rememberEl.checked));
+                } catch {}
+                setAuthStatus('Preference saved. Reload to apply.');
+            });
+        }
 
         $('#authSendLink').addEventListener('click', async () => {
             const email = $('#authEmail').value.trim();
