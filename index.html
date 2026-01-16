@@ -145,6 +145,17 @@
     <div id="loadingIndicator" style="text-align:center;padding:50px;font-size:20px;color:var(--muted)">
       Connecting to your database...
     </div>
+
+    <section class="card" id="authSection" style="display:none">
+      <h2>Sign in to Sync</h2>
+      <p style="color:var(--muted);margin-top:0">We will email you a magic link to sign in.</p>
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="authSendLink">Send magic link</button>
+      </div>
+      <div id="authStatus" style="margin-top:12px;font-size:14px;color:var(--muted)"></div>
+    </section>
     
     <section class="card" id="addEntrySection" style="display:none">
       <div style="margin-bottom: 24px;">
@@ -339,7 +350,10 @@
         targetOverrides = {};
         if (!currentUserId) {
             const user = await ensureSignedIn();
-            if (!user) return;
+            if (!user) {
+                setAuthStatus('Sign in to load your saved targets.');
+                return;
+            }
         }
         const { data, error } = await supabase
             .from('exercise_targets')
@@ -357,7 +371,10 @@
     async function saveTarget(exercise, value) {
         if (!currentUserId) {
             const user = await ensureSignedIn();
-            if (!user) return;
+            if (!user) {
+                setAuthStatus('Sign in to save targets.', true);
+                return;
+            }
         }
         targetOverrides[exercise] = value;
         const { error } = await supabase
@@ -373,6 +390,13 @@
         return targetOverrides[exercise] ?? EXERCISE_CONFIG[exercise]?.defaultTarget ?? 30;
     }
 
+    function setAuthStatus(msg, isError = false) {
+        const el = $('#authStatus');
+        if (!el) return;
+        el.textContent = msg;
+        el.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+    }
+
     async function ensureSignedIn() {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) console.error(userError);
@@ -380,13 +404,8 @@
             currentUserId = userData.user.id;
             return userData.user;
         }
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) {
-            alert('Auth error: ' + error.message);
-            return null;
-        }
-        currentUserId = data.user?.id || null;
-        return data.user || null;
+        currentUserId = null;
+        return null;
     }
 
     async function fetchData() {
@@ -395,13 +414,16 @@
             const user = await ensureSignedIn();
             if (!user) {
                 setLoading(false);
+                setAuthStatus('Sign in to load your data.');
                 return;
             }
         }
         if (!currentUserId) {
             setLoading(false);
+            setAuthStatus('Sign in to load your data.');
             return;
         }
+        setAuthStatus('');
         const { data, error } = await supabase
             .from('pushup_logs')
             .select('*')
@@ -439,7 +461,10 @@
         const userId = currentUserId || (await ensureSignedIn())?.id;
         
         if(!reps || reps < 1) return alert("Please enter valid reps");
-        if (!userId) return;
+        if (!userId) {
+            setAuthStatus('Sign in to add sets.', true);
+            return;
+        }
 
         // Filter for calculation context
         const currentFiltered = allEntries.filter(e => e.exercise === currentExercise);
@@ -827,9 +852,18 @@
     // --- 6. HELPERS & INIT ---
     
     function setLoading(isLoading) {
+        const isAuthed = Boolean(currentUserId);
         $('#loadingIndicator').style.display = isLoading ? 'block' : 'none';
+        if (isLoading) {
+            $('#authSection').style.display = 'none';
+            ['#addEntrySection', '#prSection', '#chartSection', '#summarySection'].forEach(s => {
+                $(s).style.display = 'none';
+            });
+            return;
+        }
+        $('#authSection').style.display = isAuthed ? 'none' : 'block';
         ['#addEntrySection', '#prSection', '#chartSection', '#summarySection'].forEach(s => {
-            $(s).style.display = isLoading ? 'none' : (s.includes('pr')||s.includes('summary')?'flex':'block');
+            $(s).style.display = isAuthed ? (s.includes('pr')||s.includes('summary')?'flex':'block') : 'none';
         });
     }
 
@@ -851,6 +885,7 @@
     }
 
     async function init() {
+        setLoading(true);
         flatpickr('#date', { defaultDate: 'today', dateFormat: 'Y-m-d', onChange: render });
         
         // Handle Exercise Selection Change
@@ -862,10 +897,38 @@
         
         updateTypeDropdown();
 
+        $('#authSendLink').addEventListener('click', async () => {
+            const email = $('#authEmail').value.trim();
+            if (!email) {
+                setAuthStatus('Enter a valid email address.', true);
+                return;
+            }
+            setAuthStatus('Sending magic link...');
+            const redirectTo = window.location.origin && window.location.origin !== 'null'
+                ? `${window.location.origin}${window.location.pathname}`
+                : undefined;
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: redirectTo ? { emailRedirectTo: redirectTo } : undefined
+            });
+            if (error) {
+                setAuthStatus('Auth error: ' + error.message, true);
+                return;
+            }
+            setAuthStatus('Check your email for the magic link.');
+        });
+        $('#authEmail').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') $('#authSendLink').click();
+        });
+
         const user = await ensureSignedIn();
         if (user) {
             await loadTargetsFromDb();
             updateTypeDropdown();
+            await fetchData();
+        } else {
+            setLoading(false);
+            setAuthStatus('Sign in to load your data.');
         }
 
         $('#addBtn').addEventListener('click', addEntry);
@@ -953,7 +1016,6 @@
             };
         };
 
-        await fetchData();
     }
 
     init();
