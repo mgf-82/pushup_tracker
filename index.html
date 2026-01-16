@@ -135,9 +135,12 @@
         <span class="pill" id="weekInfo">Week: —</span>
     </div>
     
-    <div class="daily-hero">
-        <span>Daily Total</span>
-        <strong id="headerDailyCount">0</strong>
+    <div style="display:flex;align-items:center;gap:12px">
+        <div class="daily-hero">
+            <span>Daily Total</span>
+            <strong id="headerDailyCount">0</strong>
+        </div>
+        <button id="signOutBtn" class="ghost" style="width:auto;padding:8px 12px;display:none">Sign out</button>
     </div>
   </header>
 
@@ -877,12 +880,14 @@
         $('#loadingIndicator').style.display = isLoading ? 'block' : 'none';
         if (isLoading) {
             $('#authSection').style.display = 'none';
+            $('#signOutBtn').style.display = 'none';
             ['#addEntrySection', '#prSection', '#chartSection', '#summarySection'].forEach(s => {
                 $(s).style.display = 'none';
             });
             return;
         }
         $('#authSection').style.display = isAuthed ? 'none' : 'block';
+        $('#signOutBtn').style.display = isAuthed ? 'inline-flex' : 'none';
         ['#addEntrySection', '#prSection', '#chartSection', '#summarySection'].forEach(s => {
             $(s).style.display = isAuthed ? (s.includes('pr')||s.includes('summary')?'flex':'block') : 'none';
         });
@@ -917,6 +922,15 @@
         });
         
         updateTypeDropdown();
+
+        $('#signOutBtn').addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            currentUserId = null;
+            allEntries = [];
+            targetOverrides = {};
+            setLoading(false);
+            setAuthStatus('Signed out.');
+        });
 
         const rememberEl = $('#rememberMe');
         if (rememberEl) {
